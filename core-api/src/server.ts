@@ -41,6 +41,8 @@ import { InMemoryQuoteRepository } from "./modules/pricing-promotions/in-memory-
 import { QuoteBasketNotFoundError, QuoteService } from "./modules/pricing-promotions/quote-service.js";
 import { InMemoryNotificationQueueRepository } from "./modules/notifications/in-memory-notification-queue-repository.js";
 import { NotificationFanoutService } from "./modules/notifications/notification-fanout-service.js";
+import { InMemoryNotificationReceiptRepository } from "./modules/notifications/in-memory-notification-receipt-repository.js";
+import { NotificationReceiptService } from "./modules/notifications/notification-receipt-service.js";
 import { InMemoryNotificationRetryRepository } from "./modules/notifications/in-memory-notification-retry-repository.js";
 import { NotificationRetryService } from "./modules/notifications/notification-retry-service.js";
 import {
@@ -97,6 +99,8 @@ import type {
 import type {
   HandleNotificationFailureInput,
   NotificationActorType,
+  NotificationDeliveryStatus,
+  RecordNotificationReceiptInput,
   ResolveNotificationTemplateInput,
   QueueNotificationInput,
 } from "./modules/notifications/types.js";
@@ -1024,6 +1028,39 @@ function validateNotificationRetryPayload(
   };
 }
 
+function validateNotificationReceiptPayload(
+  payload: Record<string, unknown>,
+): RecordNotificationReceiptInput {
+  const notificationId = payload.notificationId;
+  const channel = payload.channel;
+  const entityId = payload.entityId;
+  const status = payload.status;
+  const providerMessageId = payload.providerMessageId;
+
+  if (
+    typeof notificationId !== "string" ||
+    notificationId.trim().length === 0 ||
+    typeof channel !== "string" ||
+    !["PUSH", "SMS", "EMAIL"].includes(channel) ||
+    typeof entityId !== "string" ||
+    entityId.trim().length === 0 ||
+    typeof status !== "string" ||
+    !["SENT", "DELIVERED", "FAILED", "ACKNOWLEDGED"].includes(status) ||
+    (providerMessageId !== undefined &&
+      (typeof providerMessageId !== "string" || providerMessageId.trim().length === 0))
+  ) {
+    throw new Error("INVALID_NOTIFICATION_RECEIPT_PAYLOAD");
+  }
+
+  return {
+    notificationId,
+    channel: channel as RecordNotificationReceiptInput["channel"],
+    entityId,
+    status: status as NotificationDeliveryStatus,
+    providerMessageId: providerMessageId as string | undefined,
+  };
+}
+
 function extractBearerToken(request: IncomingMessage): string {
   const authorization = request.headers.authorization;
   if (!authorization || !authorization.startsWith("Bearer ")) {
@@ -1094,6 +1131,10 @@ export function createServer() {
   );
   const notificationRetryService = new NotificationRetryService(
     new InMemoryNotificationRetryRepository(),
+    eventBus,
+  );
+  const notificationReceiptService = new NotificationReceiptService(
+    new InMemoryNotificationReceiptRepository(),
     eventBus,
   );
   const deliveryZoneRepository = new InMemoryDeliveryZoneRepository();
@@ -1392,6 +1433,25 @@ export function createServer() {
         const input = validateNotificationRetryPayload(payload);
         const decision = await notificationRetryService.handleFailure(input);
         sendJson(response, 202, decision);
+        return;
+      }
+
+      if (request.method === "POST" && pathname === "/internal/notifications/receipts") {
+        const payload = await parseJsonBody(request);
+        const input = validateNotificationReceiptPayload(payload);
+        const receipt = await notificationReceiptService.recordReceipt(input);
+        sendJson(response, 201, receipt);
+        return;
+      }
+
+      if (request.method === "GET" && pathname === "/internal/notifications/receipts") {
+        const entityId = requestUrl.searchParams.get("entityId");
+        if (!entityId || entityId.trim().length === 0) {
+          throw new Error("INVALID_NOTIFICATION_RECEIPT_QUERY");
+        }
+
+        const receipts = notificationReceiptService.listReceiptsByEntity(entityId);
+        sendJson(response, 200, { entityId, receipts });
         return;
       }
 
@@ -1740,6 +1800,8 @@ export function createServer() {
             "INVALID_NOTIFICATION_FANOUT_PAYLOAD",
             "INVALID_NOTIFICATION_TEMPLATE_PAYLOAD",
             "INVALID_NOTIFICATION_RETRY_PAYLOAD",
+            "INVALID_NOTIFICATION_RECEIPT_PAYLOAD",
+            "INVALID_NOTIFICATION_RECEIPT_QUERY",
             "MISSING_BEARER_TOKEN",
           ].includes(error.message))
       ) {

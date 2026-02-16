@@ -81,3 +81,23 @@ export interface NotificationTemplateResolution {
   localeUsed: string;
   localizationWarning: boolean;
 }
+
+export type NotificationDeliveryStatus = "SENT" | "DELIVERED" | "FAILED" | "ACKNOWLEDGED";
+
+export interface RecordNotificationReceiptInput {
+  notificationId: string;
+  channel: NotificationChannel;
+  entityId: string;
+  status: NotificationDeliveryStatus;
+  providerMessageId?: string;
+}
+
+export interface NotificationDeliveryReceipt {
+  receiptId: string;
+  notificationId: string;
+  channel: NotificationChannel;
+  entityId: string;
+  status: NotificationDeliveryStatus;
+  providerMessageId?: string;
+  recordedAt: string;
+}
