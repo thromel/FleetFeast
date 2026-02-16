@@ -21,3 +21,43 @@ export interface NotificationQueueItem {
 export interface NotificationFanoutResult {
   queued: NotificationQueueItem[];
 }
+
+export interface NotificationRetryRecord {
+  retryId: string;
+  notificationId: string;
+  eventType: string;
+  channel: NotificationChannel;
+  entityId: string;
+  attempt: number;
+  delaySeconds: number;
+  scheduledAt: string;
+  errorCode: string;
+}
+
+export interface NotificationDeadLetterRecord {
+  deadLetterId: string;
+  notificationId: string;
+  eventType: string;
+  channel: NotificationChannel;
+  entityId: string;
+  finalAttempt: number;
+  reason: "RETRY_CAP_REACHED" | "NON_RETRIABLE";
+  errorCode: string;
+  createdAt: string;
+}
+
+export interface HandleNotificationFailureInput {
+  notificationId: string;
+  eventType: string;
+  channel: NotificationChannel;
+  entityId: string;
+  currentAttempt: number;
+  errorCode: string;
+  retriable: boolean;
+}
+
+export interface NotificationRetryDecision {
+  action: "RETRY" | "DLQ";
+  retry?: NotificationRetryRecord;
+  deadLetter?: NotificationDeadLetterRecord;
+}

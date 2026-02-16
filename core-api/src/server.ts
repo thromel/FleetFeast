@@ -41,6 +41,8 @@ import { InMemoryQuoteRepository } from "./modules/pricing-promotions/in-memory-
 import { QuoteBasketNotFoundError, QuoteService } from "./modules/pricing-promotions/quote-service.js";
 import { InMemoryNotificationQueueRepository } from "./modules/notifications/in-memory-notification-queue-repository.js";
 import { NotificationFanoutService } from "./modules/notifications/notification-fanout-service.js";
+import { InMemoryNotificationRetryRepository } from "./modules/notifications/in-memory-notification-retry-repository.js";
+import { NotificationRetryService } from "./modules/notifications/notification-retry-service.js";
 import {
   CancellationNotAllowedError,
   InvalidCheckoutError,
@@ -88,7 +90,10 @@ import type {
   PayoutEntityType,
   PublishPayoutStatementInput,
 } from "./modules/settlement/types.js";
-import type { QueueNotificationInput } from "./modules/notifications/types.js";
+import type {
+  HandleNotificationFailureInput,
+  QueueNotificationInput,
+} from "./modules/notifications/types.js";
 
 const supportedRoles: UserRole[] = [
   "consumer",
@@ -939,6 +944,47 @@ function validateNotificationFanoutPayload(payload: Record<string, unknown>): Qu
   };
 }
 
+function validateNotificationRetryPayload(
+  payload: Record<string, unknown>,
+): HandleNotificationFailureInput {
+  const notificationId = payload.notificationId;
+  const eventType = payload.eventType;
+  const channel = payload.channel;
+  const entityId = payload.entityId;
+  const currentAttempt = payload.currentAttempt;
+  const errorCode = payload.errorCode;
+  const retriable = payload.retriable;
+
+  if (
+    typeof notificationId !== "string" ||
+    notificationId.trim().length === 0 ||
+    typeof eventType !== "string" ||
+    eventType.trim().length === 0 ||
+    typeof channel !== "string" ||
+    !["PUSH", "SMS", "EMAIL"].includes(channel) ||
+    typeof entityId !== "string" ||
+    entityId.trim().length === 0 ||
+    typeof currentAttempt !== "number" ||
+    currentAttempt < 0 ||
+    !Number.isInteger(currentAttempt) ||
+    typeof errorCode !== "string" ||
+    errorCode.trim().length === 0 ||
+    typeof retriable !== "boolean"
+  ) {
+    throw new Error("INVALID_NOTIFICATION_RETRY_PAYLOAD");
+  }
+
+  return {
+    notificationId,
+    eventType,
+    channel: channel as HandleNotificationFailureInput["channel"],
+    entityId,
+    currentAttempt,
+    errorCode,
+    retriable,
+  };
+}
+
 function extractBearerToken(request: IncomingMessage): string {
   const authorization = request.headers.authorization;
   if (!authorization || !authorization.startsWith("Bearer ")) {
@@ -1003,6 +1049,10 @@ export function createServer() {
   );
   const notificationFanoutService = new NotificationFanoutService(
     new InMemoryNotificationQueueRepository(),
+    eventBus,
+  );
+  const notificationRetryService = new NotificationRetryService(
+    new InMemoryNotificationRetryRepository(),
     eventBus,
   );
   const deliveryZoneRepository = new InMemoryDeliveryZoneRepository();
@@ -1285,6 +1335,14 @@ export function createServer() {
           queuedCount: result.queued.length,
           queued: result.queued,
         });
+        return;
+      }
+
+      if (request.method === "POST" && pathname === "/internal/notifications/retry") {
+        const payload = await parseJsonBody(request);
+        const input = validateNotificationRetryPayload(payload);
+        const decision = await notificationRetryService.handleFailure(input);
+        sendJson(response, 202, decision);
         return;
       }
 
@@ -1623,6 +1681,7 @@ export function createServer() {
             "INVALID_MERCHANT_PAYOUT_QUERY",
             "INVALID_COURIER_PAYOUT_QUERY",
             "INVALID_NOTIFICATION_FANOUT_PAYLOAD",
+            "INVALID_NOTIFICATION_RETRY_PAYLOAD",
             "MISSING_BEARER_TOKEN",
           ].includes(error.message))
       ) {
