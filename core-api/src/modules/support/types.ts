@@ -60,3 +60,21 @@ export interface SupportInterventionResult {
   status: "COMPLETED" | "QUEUED";
   result: Record<string, unknown>;
 }
+
+export interface SupportEscalationRecord {
+  escalationId: string;
+  ticketId: string;
+  orderId: string;
+  issueType: string;
+  escalatedAt: string;
+  reasonCode: string;
+}
+
+export interface EvaluateSupportSLAInput {
+  evaluatedAt: string;
+}
+
+export interface SupportSLAEvaluationResult {
+  evaluatedAt: string;
+  escalations: SupportEscalationRecord[];
+}

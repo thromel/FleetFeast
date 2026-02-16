@@ -79,7 +79,9 @@ import { InMemoryPayoutStatementRepository } from "./modules/settlement/in-memor
 import { PayoutService } from "./modules/settlement/payout-service.js";
 import { PayoutStatementService } from "./modules/settlement/payout-statement-service.js";
 import { InMemorySupportTicketRepository } from "./modules/support/in-memory-support-ticket-repository.js";
+import { InMemorySupportEscalationRepository } from "./modules/support/in-memory-support-escalation-repository.js";
 import { SupportInterventionService } from "./modules/support/support-intervention-service.js";
+import { SupportSLAService } from "./modules/support/support-sla-service.js";
 import {
   SupportTicketNotFoundError,
   SupportTicketService,
@@ -104,6 +106,7 @@ import type {
 } from "./modules/settlement/types.js";
 import type {
   CreateSupportTicketInput,
+  EvaluateSupportSLAInput,
   ExecuteSupportInterventionInput,
   SupportInterventionActionType,
 } from "./modules/support/types.js";
@@ -1148,6 +1151,24 @@ function validateSupportInterventionPayload(
   };
 }
 
+function validateSupportSlaEvaluationPayload(
+  payload: Record<string, unknown>,
+): EvaluateSupportSLAInput {
+  const evaluatedAt = payload.evaluatedAt;
+
+  if (
+    typeof evaluatedAt !== "string" ||
+    evaluatedAt.trim().length === 0 ||
+    Number.isNaN(new Date(evaluatedAt).getTime())
+  ) {
+    throw new Error("INVALID_SUPPORT_SLA_PAYLOAD");
+  }
+
+  return {
+    evaluatedAt,
+  };
+}
+
 function extractBearerToken(request: IncomingMessage): string {
   const authorization = request.headers.authorization;
   if (!authorization || !authorization.startsWith("Bearer ")) {
@@ -1201,8 +1222,10 @@ export function createServer() {
     refundRequestRepository,
     paymentAuditRepository,
   );
+  const supportTicketRepository = new InMemorySupportTicketRepository();
+  const supportEscalationRepository = new InMemorySupportEscalationRepository();
   const supportTicketService = new SupportTicketService(
-    new InMemorySupportTicketRepository(),
+    supportTicketRepository,
     {
       getOrderTimeline: (orderId) => orderTimelineService.getTimeline(orderId),
       getPaymentAudit: (orderId) => paymentService.getAuditTrail(orderId),
@@ -1224,6 +1247,11 @@ export function createServer() {
           requestedBy,
         }),
     },
+    eventBus,
+  );
+  const supportSlaService = new SupportSLAService(
+    supportTicketRepository,
+    supportEscalationRepository,
     eventBus,
   );
   const settlementLedgerService = new SettlementLedgerService(
@@ -1471,6 +1499,18 @@ export function createServer() {
         const input = validateSupportInterventionPayload(payload);
         const result = await supportInterventionService.execute(input);
         sendJson(response, result.status === "QUEUED" ? 202 : 200, result);
+        return;
+      }
+
+      if (request.method === "POST" && pathname === "/internal/support/sla/evaluate") {
+        const payload = await parseJsonBody(request);
+        const input = validateSupportSlaEvaluationPayload(payload);
+        const result = await supportSlaService.evaluateEscalations(input);
+        sendJson(response, 200, {
+          evaluatedAt: result.evaluatedAt,
+          escalatedCount: result.escalations.length,
+          escalations: result.escalations,
+        });
         return;
       }
 
@@ -1934,6 +1974,7 @@ export function createServer() {
             "INVALID_ORDER_CANCELLATION_PAYLOAD",
             "INVALID_SUPPORT_TICKET_PAYLOAD",
             "INVALID_SUPPORT_INTERVENTION_PAYLOAD",
+            "INVALID_SUPPORT_SLA_PAYLOAD",
             "INVALID_PAYMENT_AUTHORIZE_PAYLOAD",
             "INVALID_PAYMENT_CAPTURE_PAYLOAD",
             "INVALID_CASH_EXPECTED_PAYLOAD",

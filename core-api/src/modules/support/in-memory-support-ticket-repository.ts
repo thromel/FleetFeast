@@ -10,4 +10,8 @@ export class InMemorySupportTicketRepository {
   async findById(ticketId: string): Promise<SupportTicket | null> {
     return this.tickets.get(ticketId) ?? null;
   }
+
+  listByStatus(status: SupportTicket["status"]): SupportTicket[] {
+    return [...this.tickets.values()].filter((ticket) => ticket.status === status);
+  }
 }
