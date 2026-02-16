@@ -39,6 +39,8 @@ import { PrepTimeService } from "./modules/merchant-catalog/prep-time-service.js
 import { StoreStatusService } from "./modules/merchant-catalog/store-status-service.js";
 import { InMemoryQuoteRepository } from "./modules/pricing-promotions/in-memory-quote-repository.js";
 import { QuoteBasketNotFoundError, QuoteService } from "./modules/pricing-promotions/quote-service.js";
+import { InMemoryNotificationQueueRepository } from "./modules/notifications/in-memory-notification-queue-repository.js";
+import { NotificationFanoutService } from "./modules/notifications/notification-fanout-service.js";
 import {
   CancellationNotAllowedError,
   InvalidCheckoutError,
@@ -86,6 +88,7 @@ import type {
   PayoutEntityType,
   PublishPayoutStatementInput,
 } from "./modules/settlement/types.js";
+import type { QueueNotificationInput } from "./modules/notifications/types.js";
 
 const supportedRoles: UserRole[] = [
   "consumer",
@@ -913,6 +916,29 @@ function validatePublishPayoutStatementPayload(
   };
 }
 
+function validateNotificationFanoutPayload(payload: Record<string, unknown>): QueueNotificationInput {
+  const eventType = payload.eventType;
+  const entityId = payload.entityId;
+  const recipientId = payload.recipientId;
+
+  if (
+    typeof eventType !== "string" ||
+    eventType.trim().length === 0 ||
+    typeof entityId !== "string" ||
+    entityId.trim().length === 0 ||
+    typeof recipientId !== "string" ||
+    recipientId.trim().length === 0
+  ) {
+    throw new Error("INVALID_NOTIFICATION_FANOUT_PAYLOAD");
+  }
+
+  return {
+    eventType,
+    entityId,
+    recipientId,
+  };
+}
+
 function extractBearerToken(request: IncomingMessage): string {
   const authorization = request.headers.authorization;
   if (!authorization || !authorization.startsWith("Bearer ")) {
@@ -973,6 +999,10 @@ export function createServer() {
   const payoutService = new PayoutService(new InMemoryPayoutBatchRepository(), eventBus);
   const payoutStatementService = new PayoutStatementService(
     new InMemoryPayoutStatementRepository(),
+    eventBus,
+  );
+  const notificationFanoutService = new NotificationFanoutService(
+    new InMemoryNotificationQueueRepository(),
     eventBus,
   );
   const deliveryZoneRepository = new InMemoryDeliveryZoneRepository();
@@ -1244,6 +1274,17 @@ export function createServer() {
 
         const statements = payoutStatementService.listStatements("COURIER", courierId);
         sendJson(response, 200, { statements });
+        return;
+      }
+
+      if (request.method === "POST" && pathname === "/internal/notifications/fanout") {
+        const payload = await parseJsonBody(request);
+        const input = validateNotificationFanoutPayload(payload);
+        const result = await notificationFanoutService.fanout(input);
+        sendJson(response, 202, {
+          queuedCount: result.queued.length,
+          queued: result.queued,
+        });
         return;
       }
 
@@ -1581,6 +1622,7 @@ export function createServer() {
             "INVALID_PAYOUT_STATEMENT_PAYLOAD",
             "INVALID_MERCHANT_PAYOUT_QUERY",
             "INVALID_COURIER_PAYOUT_QUERY",
+            "INVALID_NOTIFICATION_FANOUT_PAYLOAD",
             "MISSING_BEARER_TOKEN",
           ].includes(error.message))
       ) {
