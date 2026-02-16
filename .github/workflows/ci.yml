@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  pull_request:
+    branches: ["main", "master"]
+  push:
+    branches: ["main", "master"]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install core-api dependencies
+        run: npm install --prefix core-api
+      - name: Lint gate (type-safe compile)
+        run: npm run build --prefix core-api
+
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Test dispatch engine
+        run: go test ./...
+        working-directory: dispatch-engine
+      - name: Infrastructure structure tests
+        run: |
+          bash tests/infra/e01_s02_env_foundation_test.sh
+          bash tests/ci/e01_s04_cicd_test.sh
+
+  contract:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Contract gate
+        run: bash tests/contracts/check_contracts.sh
+
+  policy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Policy gate
+        run: bash tests/policy/check_policy.sh

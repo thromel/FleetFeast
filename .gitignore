@@ -1,0 +1,15 @@
+# Node
+node_modules/
+core-api/node_modules/
+core-api/dist/
+
+# Go
+*.test
+dispatch-engine/bin/
+
+# Env and secrets
+.env
+.env.*
+
+# OS
+.DS_Store

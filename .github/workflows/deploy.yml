@@ -1,0 +1,35 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: "Target environment"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+jobs:
+  pre_deploy_checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify infra and policy checks
+        run: |
+          bash tests/infra/e01_s02_env_foundation_test.sh
+          bash tests/policy/check_policy.sh
+
+  deploy:
+    needs: pre_deploy_checks
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target_environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Announce deployment target
+        run: echo "Deploying to ${{ inputs.target_environment }}"
+      - name: Deployment placeholder
+        run: echo "Deployment command goes here"
