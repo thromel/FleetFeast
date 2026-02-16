@@ -78,6 +78,11 @@ import { InMemoryPayoutBatchRepository } from "./modules/settlement/in-memory-pa
 import { InMemoryPayoutStatementRepository } from "./modules/settlement/in-memory-payout-statement-repository.js";
 import { PayoutService } from "./modules/settlement/payout-service.js";
 import { PayoutStatementService } from "./modules/settlement/payout-statement-service.js";
+import { InMemorySupportTicketRepository } from "./modules/support/in-memory-support-ticket-repository.js";
+import {
+  SupportTicketNotFoundError,
+  SupportTicketService,
+} from "./modules/support/support-ticket-service.js";
 import {
   SettlementLedgerService,
   UnbalancedJournalError,
@@ -96,6 +101,7 @@ import type {
   PayoutEntityType,
   PublishPayoutStatementInput,
 } from "./modules/settlement/types.js";
+import type { CreateSupportTicketInput } from "./modules/support/types.js";
 import type {
   HandleNotificationFailureInput,
   NotificationActorType,
@@ -1061,6 +1067,33 @@ function validateNotificationReceiptPayload(
   };
 }
 
+function validateCreateSupportTicketPayload(payload: Record<string, unknown>): CreateSupportTicketInput {
+  const orderId = payload.orderId;
+  const actorId = payload.actorId;
+  const issueType = payload.issueType;
+  const summary = payload.summary;
+
+  if (
+    typeof orderId !== "string" ||
+    orderId.trim().length === 0 ||
+    typeof actorId !== "string" ||
+    actorId.trim().length === 0 ||
+    typeof issueType !== "string" ||
+    issueType.trim().length === 0 ||
+    typeof summary !== "string" ||
+    summary.trim().length === 0
+  ) {
+    throw new Error("INVALID_SUPPORT_TICKET_PAYLOAD");
+  }
+
+  return {
+    orderId,
+    actorId,
+    issueType,
+    summary,
+  };
+}
+
 function extractBearerToken(request: IncomingMessage): string {
   const authorization = request.headers.authorization;
   if (!authorization || !authorization.startsWith("Bearer ")) {
@@ -1113,6 +1146,13 @@ export function createServer() {
     eventBus,
     refundRequestRepository,
     paymentAuditRepository,
+  );
+  const supportTicketService = new SupportTicketService(
+    new InMemorySupportTicketRepository(),
+    {
+      getOrderTimeline: (orderId) => orderTimelineService.getTimeline(orderId),
+      getPaymentAudit: (orderId) => paymentService.getAuditTrail(orderId),
+    },
   );
   const settlementLedgerService = new SettlementLedgerService(
     new InMemorySettlementLedgerRepository(),
@@ -1187,6 +1227,9 @@ export function createServer() {
         /^\/internal\/payments\/refunds\/([^/]+)\/approve$/,
       );
       const paymentAuditRouteMatch = pathname.match(/^\/internal\/payments\/audit\/([^/]+)$/);
+      const supportTicketTimelineRouteMatch = pathname.match(
+        /^\/api\/v1\/support\/tickets\/([^/]+)\/timeline$/,
+      );
 
       if (request.method === "GET" && pathname === "/health") {
         sendJson(response, 200, { status: "ok" });
@@ -1333,6 +1376,21 @@ export function createServer() {
           courierId: input.courierId,
         });
         sendJson(response, 200, result);
+        return;
+      }
+
+      if (request.method === "POST" && pathname === "/api/v1/support/tickets") {
+        const payload = await parseJsonBody(request);
+        const input = validateCreateSupportTicketPayload(payload);
+        const ticket = await supportTicketService.createTicket(input);
+        sendJson(response, 201, ticket);
+        return;
+      }
+
+      if (request.method === "GET" && supportTicketTimelineRouteMatch) {
+        const ticketId = decodeURIComponent(supportTicketTimelineRouteMatch[1] ?? "");
+        const timeline = await supportTicketService.getCorrelatedTimeline(ticketId);
+        sendJson(response, 200, timeline);
         return;
       }
 
@@ -1674,6 +1732,14 @@ export function createServer() {
         return;
       }
 
+      if (error instanceof SupportTicketNotFoundError) {
+        sendJson(response, 404, {
+          errorCode: error.code,
+          message: error.message,
+        });
+        return;
+      }
+
       if (error instanceof PaymentOrderNotFoundError) {
         sendJson(response, 404, {
           errorCode: error.code,
@@ -1786,6 +1852,7 @@ export function createServer() {
             "INVALID_CHECKOUT_PAYLOAD",
             "INVALID_ORDER_CREATE_PAYLOAD",
             "INVALID_ORDER_CANCELLATION_PAYLOAD",
+            "INVALID_SUPPORT_TICKET_PAYLOAD",
             "INVALID_PAYMENT_AUTHORIZE_PAYLOAD",
             "INVALID_PAYMENT_CAPTURE_PAYLOAD",
             "INVALID_CASH_EXPECTED_PAYLOAD",
