@@ -44,6 +44,10 @@ import { NotificationFanoutService } from "./modules/notifications/notification-
 import { InMemoryNotificationRetryRepository } from "./modules/notifications/in-memory-notification-retry-repository.js";
 import { NotificationRetryService } from "./modules/notifications/notification-retry-service.js";
 import {
+  NotificationTemplateNotFoundError,
+  NotificationTemplateService,
+} from "./modules/notifications/notification-template-service.js";
+import {
   CancellationNotAllowedError,
   InvalidCheckoutError,
   OrderNotFoundError,
@@ -92,6 +96,8 @@ import type {
 } from "./modules/settlement/types.js";
 import type {
   HandleNotificationFailureInput,
+  NotificationActorType,
+  ResolveNotificationTemplateInput,
   QueueNotificationInput,
 } from "./modules/notifications/types.js";
 
@@ -925,6 +931,8 @@ function validateNotificationFanoutPayload(payload: Record<string, unknown>): Qu
   const eventType = payload.eventType;
   const entityId = payload.entityId;
   const recipientId = payload.recipientId;
+  const actorType = payload.actorType;
+  const locale = payload.locale;
 
   if (
     typeof eventType !== "string" ||
@@ -932,7 +940,11 @@ function validateNotificationFanoutPayload(payload: Record<string, unknown>): Qu
     typeof entityId !== "string" ||
     entityId.trim().length === 0 ||
     typeof recipientId !== "string" ||
-    recipientId.trim().length === 0
+    recipientId.trim().length === 0 ||
+    (actorType !== undefined &&
+      (typeof actorType !== "string" ||
+        !["consumer", "courier", "merchant_operator", "support_agent"].includes(actorType))) ||
+    (locale !== undefined && (typeof locale !== "string" || locale.trim().length === 0))
   ) {
     throw new Error("INVALID_NOTIFICATION_FANOUT_PAYLOAD");
   }
@@ -941,6 +953,33 @@ function validateNotificationFanoutPayload(payload: Record<string, unknown>): Qu
     eventType,
     entityId,
     recipientId,
+    actorType: actorType as NotificationActorType | undefined,
+    locale: locale as string | undefined,
+  };
+}
+
+function validateTemplateResolvePayload(
+  payload: Record<string, unknown>,
+): ResolveNotificationTemplateInput {
+  const eventType = payload.eventType;
+  const actorType = payload.actorType;
+  const locale = payload.locale;
+
+  if (
+    typeof eventType !== "string" ||
+    eventType.trim().length === 0 ||
+    typeof actorType !== "string" ||
+    !["consumer", "courier", "merchant_operator", "support_agent"].includes(actorType) ||
+    typeof locale !== "string" ||
+    locale.trim().length === 0
+  ) {
+    throw new Error("INVALID_NOTIFICATION_TEMPLATE_PAYLOAD");
+  }
+
+  return {
+    eventType,
+    actorType: actorType as NotificationActorType,
+    locale,
   };
 }
 
@@ -1047,9 +1086,11 @@ export function createServer() {
     new InMemoryPayoutStatementRepository(),
     eventBus,
   );
+  const notificationTemplateService = new NotificationTemplateService(eventBus);
   const notificationFanoutService = new NotificationFanoutService(
     new InMemoryNotificationQueueRepository(),
     eventBus,
+    notificationTemplateService,
   );
   const notificationRetryService = new NotificationRetryService(
     new InMemoryNotificationRetryRepository(),
@@ -1335,6 +1376,14 @@ export function createServer() {
           queuedCount: result.queued.length,
           queued: result.queued,
         });
+        return;
+      }
+
+      if (request.method === "POST" && pathname === "/internal/notifications/templates/resolve") {
+        const payload = await parseJsonBody(request);
+        const input = validateTemplateResolvePayload(payload);
+        const result = await notificationTemplateService.resolveTemplate(input);
+        sendJson(response, 200, result);
         return;
       }
 
@@ -1646,6 +1695,14 @@ export function createServer() {
         return;
       }
 
+      if (error instanceof NotificationTemplateNotFoundError) {
+        sendJson(response, 404, {
+          errorCode: error.code,
+          message: error.message,
+        });
+        return;
+      }
+
       if (
         error instanceof SyntaxError ||
         (error instanceof Error &&
@@ -1681,6 +1738,7 @@ export function createServer() {
             "INVALID_MERCHANT_PAYOUT_QUERY",
             "INVALID_COURIER_PAYOUT_QUERY",
             "INVALID_NOTIFICATION_FANOUT_PAYLOAD",
+            "INVALID_NOTIFICATION_TEMPLATE_PAYLOAD",
             "INVALID_NOTIFICATION_RETRY_PAYLOAD",
             "MISSING_BEARER_TOKEN",
           ].includes(error.message))

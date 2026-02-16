@@ -4,6 +4,8 @@ export interface QueueNotificationInput {
   eventType: string;
   entityId: string;
   recipientId: string;
+  actorType?: NotificationActorType;
+  locale?: string;
 }
 
 export interface NotificationQueueItem {
@@ -60,4 +62,22 @@ export interface NotificationRetryDecision {
   action: "RETRY" | "DLQ";
   retry?: NotificationRetryRecord;
   deadLetter?: NotificationDeadLetterRecord;
+}
+
+export type NotificationActorType =
+  | "consumer"
+  | "courier"
+  | "merchant_operator"
+  | "support_agent";
+
+export interface ResolveNotificationTemplateInput {
+  eventType: string;
+  actorType: NotificationActorType;
+  locale: string;
+}
+
+export interface NotificationTemplateResolution {
+  templateKey: string;
+  localeUsed: string;
+  localizationWarning: boolean;
 }
