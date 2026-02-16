@@ -79,6 +79,7 @@ import { InMemoryPayoutStatementRepository } from "./modules/settlement/in-memor
 import { PayoutService } from "./modules/settlement/payout-service.js";
 import { PayoutStatementService } from "./modules/settlement/payout-statement-service.js";
 import { InMemorySupportTicketRepository } from "./modules/support/in-memory-support-ticket-repository.js";
+import { SupportInterventionService } from "./modules/support/support-intervention-service.js";
 import {
   SupportTicketNotFoundError,
   SupportTicketService,
@@ -101,7 +102,11 @@ import type {
   PayoutEntityType,
   PublishPayoutStatementInput,
 } from "./modules/settlement/types.js";
-import type { CreateSupportTicketInput } from "./modules/support/types.js";
+import type {
+  CreateSupportTicketInput,
+  ExecuteSupportInterventionInput,
+  SupportInterventionActionType,
+} from "./modules/support/types.js";
 import type {
   HandleNotificationFailureInput,
   NotificationActorType,
@@ -1094,6 +1099,55 @@ function validateCreateSupportTicketPayload(payload: Record<string, unknown>): C
   };
 }
 
+function validateSupportInterventionPayload(
+  payload: Record<string, unknown>,
+): ExecuteSupportInterventionInput {
+  const actionType = payload.actionType;
+  const actorId = payload.actorId;
+  const orderId = payload.orderId;
+  const reasonCode = payload.reasonCode;
+  const paymentIntentId = payload.paymentIntentId;
+  const refundAmount = payload.refundAmount;
+
+  const allowedActionTypes: SupportInterventionActionType[] = [
+    "CANCEL_ORDER",
+    "REFUND_PAYMENT",
+    "REASSIGN_COURIER",
+  ];
+
+  if (
+    typeof actionType !== "string" ||
+    !allowedActionTypes.includes(actionType as SupportInterventionActionType) ||
+    typeof actorId !== "string" ||
+    actorId.trim().length === 0 ||
+    typeof orderId !== "string" ||
+    orderId.trim().length === 0 ||
+    typeof reasonCode !== "string" ||
+    reasonCode.trim().length === 0
+  ) {
+    throw new Error("INVALID_SUPPORT_INTERVENTION_PAYLOAD");
+  }
+
+  if (
+    actionType === "REFUND_PAYMENT" &&
+    (typeof paymentIntentId !== "string" ||
+      paymentIntentId.trim().length === 0 ||
+      typeof refundAmount !== "number" ||
+      refundAmount <= 0)
+  ) {
+    throw new Error("INVALID_SUPPORT_INTERVENTION_PAYLOAD");
+  }
+
+  return {
+    actionType: actionType as SupportInterventionActionType,
+    actorId,
+    orderId,
+    reasonCode,
+    paymentIntentId: paymentIntentId as string | undefined,
+    refundAmount: refundAmount as number | undefined,
+  };
+}
+
 function extractBearerToken(request: IncomingMessage): string {
   const authorization = request.headers.authorization;
   if (!authorization || !authorization.startsWith("Bearer ")) {
@@ -1153,6 +1207,24 @@ export function createServer() {
       getOrderTimeline: (orderId) => orderTimelineService.getTimeline(orderId),
       getPaymentAudit: (orderId) => paymentService.getAuditTrail(orderId),
     },
+  );
+  const supportInterventionService = new SupportInterventionService(
+    {
+      requestCancellation: ({ orderId, reasonCode }) =>
+        orderService.requestCancellation(orderId, {
+          actor: "support_agent",
+          reasonCode,
+        }),
+      requestRefund: ({ orderId, paymentIntentId, amount, reasonCode, requestedBy }) =>
+        paymentService.requestRefund({
+          orderId,
+          paymentIntentId,
+          amount,
+          reasonCode,
+          requestedBy,
+        }),
+    },
+    eventBus,
   );
   const settlementLedgerService = new SettlementLedgerService(
     new InMemorySettlementLedgerRepository(),
@@ -1391,6 +1463,14 @@ export function createServer() {
         const ticketId = decodeURIComponent(supportTicketTimelineRouteMatch[1] ?? "");
         const timeline = await supportTicketService.getCorrelatedTimeline(ticketId);
         sendJson(response, 200, timeline);
+        return;
+      }
+
+      if (request.method === "POST" && pathname === "/api/v1/support/interventions/execute") {
+        const payload = await parseJsonBody(request);
+        const input = validateSupportInterventionPayload(payload);
+        const result = await supportInterventionService.execute(input);
+        sendJson(response, result.status === "QUEUED" ? 202 : 200, result);
         return;
       }
 
@@ -1853,6 +1933,7 @@ export function createServer() {
             "INVALID_ORDER_CREATE_PAYLOAD",
             "INVALID_ORDER_CANCELLATION_PAYLOAD",
             "INVALID_SUPPORT_TICKET_PAYLOAD",
+            "INVALID_SUPPORT_INTERVENTION_PAYLOAD",
             "INVALID_PAYMENT_AUTHORIZE_PAYLOAD",
             "INVALID_PAYMENT_CAPTURE_PAYLOAD",
             "INVALID_CASH_EXPECTED_PAYLOAD",

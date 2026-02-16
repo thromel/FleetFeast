@@ -40,3 +40,23 @@ export interface SupportCorrelationSources {
   getOrderTimeline(orderId: string): OrderTimelineEntry[];
   getPaymentAudit(orderId: string): Promise<PaymentAuditRecord[]>;
 }
+
+export type SupportInterventionActionType =
+  | "CANCEL_ORDER"
+  | "REFUND_PAYMENT"
+  | "REASSIGN_COURIER";
+
+export interface ExecuteSupportInterventionInput {
+  actionType: SupportInterventionActionType;
+  actorId: string;
+  orderId: string;
+  reasonCode: string;
+  paymentIntentId?: string;
+  refundAmount?: number;
+}
+
+export interface SupportInterventionResult {
+  actionType: SupportInterventionActionType;
+  status: "COMPLETED" | "QUEUED";
+  result: Record<string, unknown>;
+}
