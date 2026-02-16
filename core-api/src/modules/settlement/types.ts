@@ -57,3 +57,36 @@ export interface PayoutBatch {
   status: "GENERATED";
   createdAt: string;
 }
+
+export interface SettlementReconciliationRecord {
+  entityId: string;
+  amount: number;
+}
+
+export interface ReconcileSettlementInput {
+  expectedRecords: SettlementReconciliationRecord[];
+  actualRecords: SettlementReconciliationRecord[];
+  toleranceCents: number;
+}
+
+export type SettlementReconciliationExceptionReason =
+  | "AMOUNT_MISMATCH"
+  | "MISSING_EXPECTED_RECORD"
+  | "MISSING_ACTUAL_RECORD";
+
+export interface SettlementReconciliationExceptionCase {
+  entityId: string;
+  expectedAmount: number;
+  actualAmount: number;
+  variance: number;
+  reason: SettlementReconciliationExceptionReason;
+}
+
+export interface SettlementReconciliationResult {
+  reconciliationId: string;
+  reconciledAt: string;
+  toleranceCents: number;
+  totalExpectedAmount: number;
+  totalActualAmount: number;
+  exceptionCases: SettlementReconciliationExceptionCase[];
+}
