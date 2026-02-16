@@ -90,3 +90,36 @@ export interface SettlementReconciliationResult {
   totalActualAmount: number;
   exceptionCases: SettlementReconciliationExceptionCase[];
 }
+
+export interface PayoutStatementLineItem {
+  label: string;
+  amount: number;
+}
+
+export interface PublishPayoutStatementInput {
+  payoutBatchId: string;
+  entityType: PayoutEntityType;
+  entityId: string;
+  periodStart: string;
+  periodEnd: string;
+  currency: string;
+  totalAmount: number;
+  lineItems: PayoutStatementLineItem[];
+}
+
+export type PayoutStatementFormat = "PDF" | "PLAINTEXT";
+
+export interface PayoutStatement {
+  statementId: string;
+  payoutBatchId: string;
+  entityType: PayoutEntityType;
+  entityId: string;
+  periodStart: string;
+  periodEnd: string;
+  currency: string;
+  totalAmount: number;
+  lineItems: PayoutStatementLineItem[];
+  format: PayoutStatementFormat;
+  renderedContent: string;
+  createdAt: string;
+}

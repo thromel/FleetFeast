@@ -65,7 +65,9 @@ import {
 } from "./modules/payments/payment-service.js";
 import { InMemorySettlementLedgerRepository } from "./modules/settlement/in-memory-settlement-ledger-repository.js";
 import { InMemoryPayoutBatchRepository } from "./modules/settlement/in-memory-payout-batch-repository.js";
+import { InMemoryPayoutStatementRepository } from "./modules/settlement/in-memory-payout-statement-repository.js";
 import { PayoutService } from "./modules/settlement/payout-service.js";
+import { PayoutStatementService } from "./modules/settlement/payout-statement-service.js";
 import {
   SettlementLedgerService,
   UnbalancedJournalError,
@@ -82,6 +84,7 @@ import type {
   LedgerSide,
   PostSettlementJournalInput,
   PayoutEntityType,
+  PublishPayoutStatementInput,
 } from "./modules/settlement/types.js";
 
 const supportedRoles: UserRole[] = [
@@ -838,6 +841,78 @@ function validatePayoutBatchPayload(payload: Record<string, unknown>): GenerateP
   };
 }
 
+function validatePublishPayoutStatementPayload(
+  payload: Record<string, unknown>,
+): PublishPayoutStatementInput {
+  const payoutBatchId = payload.payoutBatchId;
+  const entityType = payload.entityType;
+  const entityId = payload.entityId;
+  const periodStart = payload.periodStart;
+  const periodEnd = payload.periodEnd;
+  const currency = payload.currency;
+  const totalAmount = payload.totalAmount;
+  const lineItems = payload.lineItems;
+
+  if (
+    typeof payoutBatchId !== "string" ||
+    payoutBatchId.trim().length === 0 ||
+    typeof entityType !== "string" ||
+    !["MERCHANT", "COURIER"].includes(entityType) ||
+    typeof entityId !== "string" ||
+    entityId.trim().length === 0 ||
+    typeof periodStart !== "string" ||
+    Number.isNaN(new Date(periodStart).getTime()) ||
+    typeof periodEnd !== "string" ||
+    Number.isNaN(new Date(periodEnd).getTime()) ||
+    typeof currency !== "string" ||
+    currency.trim().length === 0 ||
+    typeof totalAmount !== "number" ||
+    !Array.isArray(lineItems)
+  ) {
+    throw new Error("INVALID_PAYOUT_STATEMENT_PAYLOAD");
+  }
+
+  const normalizedLineItems = lineItems.map((lineItem) => {
+    if (
+      typeof lineItem !== "object" ||
+      lineItem === null ||
+      !("label" in lineItem) ||
+      !("amount" in lineItem)
+    ) {
+      throw new Error("INVALID_PAYOUT_STATEMENT_PAYLOAD");
+    }
+
+    const normalized = lineItem as {
+      label: unknown;
+      amount: unknown;
+    };
+
+    if (
+      typeof normalized.label !== "string" ||
+      normalized.label.trim().length === 0 ||
+      typeof normalized.amount !== "number"
+    ) {
+      throw new Error("INVALID_PAYOUT_STATEMENT_PAYLOAD");
+    }
+
+    return {
+      label: normalized.label,
+      amount: normalized.amount,
+    };
+  });
+
+  return {
+    payoutBatchId,
+    entityType: entityType as PayoutEntityType,
+    entityId,
+    periodStart,
+    periodEnd,
+    currency,
+    totalAmount,
+    lineItems: normalizedLineItems,
+  };
+}
+
 function extractBearerToken(request: IncomingMessage): string {
   const authorization = request.headers.authorization;
   if (!authorization || !authorization.startsWith("Bearer ")) {
@@ -896,6 +971,10 @@ export function createServer() {
     eventBus,
   );
   const payoutService = new PayoutService(new InMemoryPayoutBatchRepository(), eventBus);
+  const payoutStatementService = new PayoutStatementService(
+    new InMemoryPayoutStatementRepository(),
+    eventBus,
+  );
   const deliveryZoneRepository = new InMemoryDeliveryZoneRepository();
   const deliveryZoneService = new DeliveryZoneService(deliveryZoneRepository);
 
@@ -1135,6 +1214,36 @@ export function createServer() {
         const input = validatePayoutBatchPayload(payload);
         const batch = await payoutService.generateBatch(input);
         sendJson(response, 201, batch);
+        return;
+      }
+
+      if (request.method === "POST" && pathname === "/internal/settlement/payout-statements/publish") {
+        const payload = await parseJsonBody(request);
+        const input = validatePublishPayoutStatementPayload(payload);
+        const statement = await payoutStatementService.publishStatement(input);
+        sendJson(response, 201, statement);
+        return;
+      }
+
+      if (request.method === "GET" && pathname === "/api/v1/merchant/payouts") {
+        const merchantId = requestUrl.searchParams.get("merchantId");
+        if (!merchantId || merchantId.trim().length === 0) {
+          throw new Error("INVALID_MERCHANT_PAYOUT_QUERY");
+        }
+
+        const statements = payoutStatementService.listStatements("MERCHANT", merchantId);
+        sendJson(response, 200, { statements });
+        return;
+      }
+
+      if (request.method === "GET" && pathname === "/api/v1/courier/payouts") {
+        const courierId = requestUrl.searchParams.get("courierId");
+        if (!courierId || courierId.trim().length === 0) {
+          throw new Error("INVALID_COURIER_PAYOUT_QUERY");
+        }
+
+        const statements = payoutStatementService.listStatements("COURIER", courierId);
+        sendJson(response, 200, { statements });
         return;
       }
 
@@ -1469,6 +1578,9 @@ export function createServer() {
             "INVALID_REFUND_APPROVAL_PAYLOAD",
             "INVALID_SETTLEMENT_JOURNAL_PAYLOAD",
             "INVALID_PAYOUT_BATCH_PAYLOAD",
+            "INVALID_PAYOUT_STATEMENT_PAYLOAD",
+            "INVALID_MERCHANT_PAYOUT_QUERY",
+            "INVALID_COURIER_PAYOUT_QUERY",
             "MISSING_BEARER_TOKEN",
           ].includes(error.message))
       ) {
