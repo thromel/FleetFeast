@@ -2,17 +2,36 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "AllowCoreServiceActions",
+      "Sid": "AllowReadOnlyDescribeActions",
       "Effect": "Allow",
       "Action": [
         "ec2:Describe*",
-        "ecs:Describe*",
+        "ecs:Describe*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AllowScopedLogWrite",
+      "Effect": "Allow",
+      "Action": [
         "logs:CreateLogStream",
-        "logs:PutLogEvents",
+        "logs:PutLogEvents"
+      ],
+      "Resource": [
+        "arn:aws:logs:*:*:log-group:/foodpanda/*:log-stream:*"
+      ]
+    },
+    {
+      "Sid": "AllowScopedConfigSecretRead",
+      "Effect": "Allow",
+      "Action": [
         "ssm:GetParameter",
         "secretsmanager:GetSecretValue"
       ],
-      "Resource": "*"
+      "Resource": [
+        "arn:aws:ssm:*:*:parameter/foodpanda/*",
+        "arn:aws:secretsmanager:*:*:secret:foodpanda/*"
+      ]
     },
     {
       "Sid": "DenyIamMutationAndAccountTakeover",
