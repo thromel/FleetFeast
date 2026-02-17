@@ -30,6 +30,8 @@ import { InMemorySessionStore } from "./modules/identity/in-memory-session-store
 import { DuplicateIdentityError, IdentityService } from "./modules/identity/identity-service.js";
 import { isAllowed } from "./modules/identity/rbac.js";
 import type { RegisterIdentityInput, UserRole } from "./modules/identity/types.js";
+import { InMemoryStructuredLogRepository } from "./modules/observability/in-memory-structured-log-repository.js";
+import { ObservabilityService } from "./modules/observability/observability-service.js";
 import { InMemoryMenuRepository } from "./modules/merchant-catalog/in-memory-menu-repository.js";
 import { InMemoryItemAvailabilityRepository } from "./modules/merchant-catalog/in-memory-item-availability-repository.js";
 import { InMemoryStoreStatusRepository } from "./modules/merchant-catalog/in-memory-store-status-repository.js";
@@ -1348,6 +1350,10 @@ function extractBearerToken(request: IncomingMessage): string {
 export function createServer() {
   const repository = new InMemoryIdentityRepository();
   const eventBus = new InMemoryEventBus();
+  const observabilityService = new ObservabilityService(
+    new InMemoryStructuredLogRepository(),
+    eventBus,
+  );
   const identityService = new IdentityService(repository, eventBus);
   const sessionStore = new InMemorySessionStore();
   const authService = new AuthService(
@@ -1457,9 +1463,28 @@ export function createServer() {
   const deliveryZoneService = new DeliveryZoneService(deliveryZoneRepository);
 
   return createHttpServer(async (request, response) => {
+    const requestUrl = new URL(request.url ?? "/", "http://localhost");
+    const pathname = requestUrl.pathname;
+    const traceContext = observabilityService.startTrace({
+      method: request.method ?? "UNKNOWN",
+      route: pathname,
+    });
+    response.setHeader("x-trace-id", traceContext.traceId);
+
+    let traceFinished = false;
+    const originalEnd = response.end.bind(response);
+    response.end = ((...args: unknown[]) => {
+      if (!traceFinished) {
+        traceFinished = true;
+        observabilityService.finishTrace(traceContext, {
+          statusCode: response.statusCode,
+        });
+      }
+
+      return (originalEnd as (...args: unknown[]) => ServerResponse)(...args);
+    }) as unknown as ServerResponse["end"];
+
     try {
-      const requestUrl = new URL(request.url ?? "/", "http://localhost");
-      const pathname = requestUrl.pathname;
 
       const menuRouteMatch = pathname.match(/^\/api\/v1\/merchant\/catalog\/menus\/([^/]+)$/);
       const menuVersionsRouteMatch = pathname.match(
@@ -1509,6 +1534,13 @@ export function createServer() {
       const manualReviewResolveRouteMatch = pathname.match(
         /^\/api\/v1\/admin\/risk\/reviews\/([^/]+)\/resolve$/,
       );
+
+      if (request.method === "GET" && pathname === "/internal/observability/logs") {
+        const traceId = requestUrl.searchParams.get("traceId") ?? undefined;
+        const logs = observabilityService.listLogs(traceId);
+        sendJson(response, 200, { logs });
+        return;
+      }
 
       if (request.method === "GET" && pathname === "/health") {
         sendJson(response, 200, { status: "ok" });
