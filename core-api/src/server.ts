@@ -621,6 +621,19 @@ function validateOrderCancellationPayload(payload: Record<string, unknown>): {
   };
 }
 
+function validateMerchantOrderRejectPayload(payload: Record<string, unknown>): {
+  reasonCode: string;
+} {
+  const reasonCode = payload.reasonCode;
+  if (typeof reasonCode !== "string" || reasonCode.trim().length === 0) {
+    throw new Error("INVALID_MERCHANT_ORDER_REJECT_PAYLOAD");
+  }
+
+  return {
+    reasonCode,
+  };
+}
+
 function validatePaymentAuthorizePayload(payload: Record<string, unknown>): {
   orderId: string;
   method: PaymentMethod;
@@ -1541,6 +1554,9 @@ export function createServer() {
       const merchantOrderAcceptRouteMatch = pathname.match(
         /^\/api\/v1\/merchant\/orders\/([^/]+)\/accept$/,
       );
+      const merchantOrderRejectRouteMatch = pathname.match(
+        /^\/api\/v1\/merchant\/orders\/([^/]+)\/reject$/,
+      );
       const merchantOrderTimeoutRouteMatch = pathname.match(
         /^\/internal\/orders\/([^/]+)\/merchant-timeout$/,
       );
@@ -1928,6 +1944,24 @@ export function createServer() {
         return;
       }
 
+      if (request.method === "POST" && merchantOrderRejectRouteMatch) {
+        const payload = await parseJsonBody(request);
+        const input = validateMerchantOrderRejectPayload(payload);
+        const orderId = decodeURIComponent(merchantOrderRejectRouteMatch[1] ?? "");
+        const order = await orderService.requestCancellation(orderId, {
+          actor: "merchant_operator",
+          reasonCode: input.reasonCode,
+        });
+        sendJson(response, 200, order);
+        return;
+      }
+
+      if (request.method === "GET" && pathname === "/api/v1/merchant/orders") {
+        const orders = await orderService.listOrders();
+        sendJson(response, 200, { orders });
+        return;
+      }
+
       if (request.method === "POST" && merchantOrderTimeoutRouteMatch) {
         const orderId = decodeURIComponent(merchantOrderTimeoutRouteMatch[1] ?? "");
         const order = await orderService.handleMerchantDecisionTimeout(orderId);
@@ -2303,6 +2337,7 @@ export function createServer() {
             "INVALID_CHECKOUT_PAYLOAD",
             "INVALID_ORDER_CREATE_PAYLOAD",
             "INVALID_ORDER_CANCELLATION_PAYLOAD",
+            "INVALID_MERCHANT_ORDER_REJECT_PAYLOAD",
             "INVALID_SUPPORT_TICKET_PAYLOAD",
             "INVALID_SUPPORT_INTERVENTION_PAYLOAD",
             "INVALID_SUPPORT_SLA_PAYLOAD",

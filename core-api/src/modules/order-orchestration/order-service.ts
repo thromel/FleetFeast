@@ -233,6 +233,10 @@ export class OrderService {
     return updated;
   }
 
+  async listOrders(): Promise<Order[]> {
+    return this.orderRepository.list();
+  }
+
   private publishEvent(event: DomainEvent): void {
     this.eventBus.publish(event);
     this.timelineService?.projectEvent(event);
