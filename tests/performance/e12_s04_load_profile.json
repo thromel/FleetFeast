@@ -1,0 +1,49 @@
+{
+  "storyId": "E12-S04",
+  "scenarioName": "early-scale-peak",
+  "assumptions": {
+    "mau": 10000,
+    "dailyPeakOrders": 1000,
+    "monthlyOrdersApprox": 18000,
+    "targetAvailabilityPercent": 99.9,
+    "latencyBudgetsMs": {
+      "checkoutP95": 700,
+      "timelineP95": 400
+    }
+  },
+  "loadModel": {
+    "durationMinutes": 30,
+    "peakVirtualUsers": 80,
+    "peakRequestsPerSecond": 35,
+    "phases": [
+      {
+        "name": "warmup",
+        "durationMinutes": 5,
+        "startVUs": 1,
+        "targetVUs": 20
+      },
+      {
+        "name": "ramp-to-peak",
+        "durationMinutes": 10,
+        "startVUs": 20,
+        "targetVUs": 80
+      },
+      {
+        "name": "peak-steady-state",
+        "durationMinutes": 15,
+        "startVUs": 80,
+        "targetVUs": 80
+      }
+    ]
+  },
+  "journeyMix": {
+    "checkoutAndCreateOrder": 0.7,
+    "timelineRead": 0.3
+  },
+  "thresholds": {
+    "http_req_failed": "rate<0.01",
+    "http_req_duration{endpoint:checkout}": "p(95)<700",
+    "http_req_duration{endpoint:timeline}": "p(95)<400",
+    "checks": "rate>0.985"
+  }
+}
