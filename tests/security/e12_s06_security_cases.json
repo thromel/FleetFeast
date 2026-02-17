@@ -1,0 +1,31 @@
+{
+  "storyId": "E12-S06",
+  "suiteVersion": "1.0.0",
+  "authz_boundaries": {
+    "testFiles": [
+      "core-api/dist/modules/identity/admin.route.authz.test.js",
+      "core-api/dist/modules/support/support-intervention.route.test.js"
+    ],
+    "requiredErrorCode": "IDENTITY_PERMISSION_DENIED"
+  },
+  "audit_completeness": {
+    "routeTestFiles": [
+      "core-api/dist/modules/payments/payment-audit.route.test.js",
+      "core-api/dist/modules/risk-compliance/compliance-audit.route.test.js"
+    ],
+    "requiredEventTypes": [
+      "payment.audit_recorded.v1",
+      "risk.audit_log_appended.v1",
+      "platform.audit_write_failure_alert.v1",
+      "support.intervention_executed.v1",
+      "payout.statement_published.v1"
+    ],
+    "sourceFiles": [
+      "core-api/src/modules/payments/payment-service.ts",
+      "core-api/src/modules/risk-compliance/compliance-audit-service.ts",
+      "core-api/src/modules/support/support-intervention-service.ts",
+      "core-api/src/modules/settlement/payout-statement-service.ts"
+    ],
+    "contractDocument": "docs/architecture/api-and-event-contracts-v1.md"
+  }
+}
