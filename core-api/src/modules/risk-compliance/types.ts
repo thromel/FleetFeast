@@ -62,3 +62,39 @@ export interface ManualReviewRecord {
   updatedAt: string;
   resolution?: ManualReviewResolution;
 }
+
+export interface AppendComplianceAuditEventInput {
+  actionType: string;
+  actorId: string;
+  targetType: string;
+  targetId: string;
+  reasonCode: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface ComplianceAuditEvent {
+  auditEventId: string;
+  actionType: string;
+  actorId: string;
+  targetType: string;
+  targetId: string;
+  reasonCode: string;
+  metadata: Record<string, unknown>;
+  timestamp: string;
+  previousHash: string;
+  hash: string;
+}
+
+export interface GenerateComplianceEvidenceInput {
+  generatedBy: string;
+  generatedAt: string;
+}
+
+export interface ComplianceEvidenceReport {
+  reportId: string;
+  generatedBy: string;
+  generatedAt: string;
+  totalEvents: number;
+  chainIntegrity: boolean;
+  countByActionType: Record<string, number>;
+}

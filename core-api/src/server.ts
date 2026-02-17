@@ -88,6 +88,8 @@ import {
 } from "./modules/support/support-ticket-service.js";
 import { InMemoryRiskPolicyRepository } from "./modules/risk-compliance/in-memory-risk-policy-repository.js";
 import { InMemoryManualReviewRepository } from "./modules/risk-compliance/in-memory-manual-review-repository.js";
+import { InMemoryComplianceAuditRepository } from "./modules/risk-compliance/in-memory-compliance-audit-repository.js";
+import { ComplianceAuditService } from "./modules/risk-compliance/compliance-audit-service.js";
 import {
   ManualReviewNotFoundError,
   ManualReviewService,
@@ -118,7 +120,9 @@ import type {
   SupportInterventionActionType,
 } from "./modules/support/types.js";
 import type {
+  AppendComplianceAuditEventInput,
   EvaluateRiskPolicyInput,
+  GenerateComplianceEvidenceInput,
   QueueManualReviewInput,
   ResolveManualReviewInput,
 } from "./modules/risk-compliance/types.js";
@@ -1272,6 +1276,66 @@ function validateResolveManualReviewPayload(
   };
 }
 
+function validateAppendComplianceAuditPayload(
+  payload: Record<string, unknown>,
+): AppendComplianceAuditEventInput {
+  const actionType = payload.actionType;
+  const actorId = payload.actorId;
+  const targetType = payload.targetType;
+  const targetId = payload.targetId;
+  const reasonCode = payload.reasonCode;
+  const metadata = payload.metadata;
+
+  if (
+    typeof actionType !== "string" ||
+    actionType.trim().length === 0 ||
+    typeof actorId !== "string" ||
+    actorId.trim().length === 0 ||
+    typeof targetType !== "string" ||
+    targetType.trim().length === 0 ||
+    typeof targetId !== "string" ||
+    targetId.trim().length === 0 ||
+    typeof reasonCode !== "string" ||
+    reasonCode.trim().length === 0 ||
+    typeof metadata !== "object" ||
+    metadata === null ||
+    Array.isArray(metadata)
+  ) {
+    throw new Error("INVALID_COMPLIANCE_AUDIT_PAYLOAD");
+  }
+
+  return {
+    actionType,
+    actorId,
+    targetType,
+    targetId,
+    reasonCode,
+    metadata: metadata as Record<string, unknown>,
+  };
+}
+
+function validateGenerateComplianceEvidencePayload(
+  payload: Record<string, unknown>,
+): GenerateComplianceEvidenceInput {
+  const generatedBy = payload.generatedBy;
+  const generatedAt = payload.generatedAt;
+
+  if (
+    typeof generatedBy !== "string" ||
+    generatedBy.trim().length === 0 ||
+    typeof generatedAt !== "string" ||
+    generatedAt.trim().length === 0 ||
+    Number.isNaN(new Date(generatedAt).getTime())
+  ) {
+    throw new Error("INVALID_COMPLIANCE_EVIDENCE_PAYLOAD");
+  }
+
+  return {
+    generatedBy,
+    generatedAt,
+  };
+}
+
 function extractBearerToken(request: IncomingMessage): string {
   const authorization = request.headers.authorization;
   if (!authorization || !authorization.startsWith("Bearer ")) {
@@ -1360,6 +1424,10 @@ export function createServer() {
   const riskPolicyService = new RiskPolicyService(new InMemoryRiskPolicyRepository(), eventBus);
   const manualReviewService = new ManualReviewService(
     new InMemoryManualReviewRepository(),
+    eventBus,
+  );
+  const complianceAuditService = new ComplianceAuditService(
+    new InMemoryComplianceAuditRepository(),
     eventBus,
   );
   const settlementLedgerService = new SettlementLedgerService(
@@ -1647,6 +1715,28 @@ export function createServer() {
         const input = validateResolveManualReviewPayload(reviewId, payload);
         const review = await manualReviewService.resolveReview(input);
         sendJson(response, 200, review);
+        return;
+      }
+
+      if (request.method === "POST" && pathname === "/internal/risk/compliance/audit/events") {
+        const payload = await parseJsonBody(request);
+        const input = validateAppendComplianceAuditPayload(payload);
+        const event = await complianceAuditService.appendEvent(input);
+        sendJson(response, 201, event);
+        return;
+      }
+
+      if (request.method === "GET" && pathname === "/internal/risk/compliance/audit/events") {
+        const events = complianceAuditService.listEvents();
+        sendJson(response, 200, { events });
+        return;
+      }
+
+      if (request.method === "POST" && pathname === "/internal/risk/compliance/evidence/jobs") {
+        const payload = await parseJsonBody(request);
+        const input = validateGenerateComplianceEvidencePayload(payload);
+        const report = await complianceAuditService.generateEvidenceReport(input);
+        sendJson(response, 200, report);
         return;
       }
 
@@ -2122,6 +2212,8 @@ export function createServer() {
             "INVALID_RISK_POLICY_EVALUATE_PAYLOAD",
             "INVALID_MANUAL_REVIEW_QUEUE_PAYLOAD",
             "INVALID_MANUAL_REVIEW_RESOLVE_PAYLOAD",
+            "INVALID_COMPLIANCE_AUDIT_PAYLOAD",
+            "INVALID_COMPLIANCE_EVIDENCE_PAYLOAD",
             "INVALID_PAYMENT_AUTHORIZE_PAYLOAD",
             "INVALID_PAYMENT_CAPTURE_PAYLOAD",
             "INVALID_CASH_EXPECTED_PAYLOAD",
