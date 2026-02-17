@@ -1,0 +1,66 @@
+{
+  "storyId": "E12-S08",
+  "version": "1.0.0",
+  "gates": [
+    {
+      "id": "contracts_gate",
+      "description": "REST/gRPC/event contract compatibility checks",
+      "required": true,
+      "command": "bash tests/contracts/check_contracts.sh"
+    },
+    {
+      "id": "performance_gate",
+      "description": "Early-scale load test suite dry-run gate",
+      "required": true,
+      "command": "bash tests/performance/e12_s04_load_suite_test.sh"
+    },
+    {
+      "id": "resilience_gate",
+      "description": "Failure injection suite gate",
+      "required": true,
+      "command": "bash tests/resilience/e12_s05_failure_injection_test.sh"
+    },
+    {
+      "id": "security_gate",
+      "description": "Security verification suite gate",
+      "required": true,
+      "command": "bash tests/security/e12_s06_security_verification_test.sh"
+    },
+    {
+      "id": "cost_gate",
+      "description": "Cost model reconciliation and anomaly threshold gate",
+      "required": true,
+      "command": "bash tests/cost/e12_s07_cost_validation_test.sh"
+    },
+    {
+      "id": "core_api_tests",
+      "description": "Core API full regression suite",
+      "required": true,
+      "command": "npm test --prefix core-api"
+    },
+    {
+      "id": "dispatch_tests",
+      "description": "Dispatch engine regression suite",
+      "required": true,
+      "command": "cd dispatch-engine && go test ./..."
+    },
+    {
+      "id": "dr_automation_gate",
+      "description": "DR automation gate",
+      "required": true,
+      "command": "bash tests/infra/e11_s04_dr_automation_test.sh"
+    },
+    {
+      "id": "dr_evidence_gate",
+      "description": "DR evidence gate",
+      "required": true,
+      "command": "bash tests/infra/e11_s05_dr_evidence_test.sh"
+    },
+    {
+      "id": "infra_security_gate",
+      "description": "IAM hardening and security baseline gate",
+      "required": true,
+      "command": "bash tests/infra/e11_s06_security_hardening_test.sh"
+    }
+  ]
+}

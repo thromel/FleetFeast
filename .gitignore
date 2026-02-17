@@ -18,6 +18,8 @@ dispatch-engine/bin/
 tests/performance/results/*.json
 tests/resilience/results/*.json
 tests/cost/results/*.json
+tests/release/results/*.json
 !tests/performance/results/.gitkeep
 !tests/resilience/results/.gitkeep
 !tests/cost/results/.gitkeep
+!tests/release/results/.gitkeep
