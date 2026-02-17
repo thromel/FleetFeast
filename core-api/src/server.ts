@@ -981,6 +981,30 @@ function validatePayoutBatchPayload(payload: Record<string, unknown>): GenerateP
   };
 }
 
+function validatePayoutScheduleRunPayload(
+  scheduleId: string,
+  payload: Record<string, unknown>,
+): GeneratePayoutBatchInput {
+  if (scheduleId.trim().length === 0) {
+    throw new Error("INVALID_PAYOUT_SCHEDULE_RUN_PAYLOAD");
+  }
+
+  try {
+    return validatePayoutBatchPayload({
+      ...payload,
+      scheduleId,
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "INVALID_PAYOUT_BATCH_PAYLOAD"
+    ) {
+      throw new Error("INVALID_PAYOUT_SCHEDULE_RUN_PAYLOAD");
+    }
+    throw error;
+  }
+}
+
 function validatePublishPayoutStatementPayload(
   payload: Record<string, unknown>,
 ): PublishPayoutStatementInput {
@@ -1658,6 +1682,9 @@ export function createServer() {
       const refundApprovalRouteMatch = pathname.match(
         /^\/internal\/payments\/refunds\/([^/]+)\/approve$/,
       );
+      const payoutScheduleRunRouteMatch = pathname.match(
+        /^\/internal\/settlement\/payout-schedules\/([^/]+)\/run$/,
+      );
       const paymentAuditRouteMatch = pathname.match(/^\/internal\/payments\/audit\/([^/]+)$/);
       const supportTicketTimelineRouteMatch = pathname.match(
         /^\/api\/v1\/support\/tickets\/([^/]+)\/timeline$/,
@@ -1998,6 +2025,15 @@ export function createServer() {
         const input = validatePayoutBatchPayload(payload);
         const batch = await payoutService.generateBatch(input);
         sendJson(response, 201, batch);
+        return;
+      }
+
+      if (request.method === "POST" && payoutScheduleRunRouteMatch) {
+        const payload = await parseJsonBody(request);
+        const scheduleId = decodeURIComponent(payoutScheduleRunRouteMatch[1] ?? "");
+        const input = validatePayoutScheduleRunPayload(scheduleId, payload);
+        const result = await payoutService.runScheduledBatch(input);
+        sendJson(response, result.created ? 201 : 200, result.batch);
         return;
       }
 
@@ -2507,6 +2543,7 @@ export function createServer() {
             "INVALID_REFUND_APPROVAL_PAYLOAD",
             "INVALID_SETTLEMENT_JOURNAL_PAYLOAD",
             "INVALID_PAYOUT_BATCH_PAYLOAD",
+            "INVALID_PAYOUT_SCHEDULE_RUN_PAYLOAD",
             "INVALID_PAYOUT_STATEMENT_PAYLOAD",
             "INVALID_MERCHANT_PAYOUT_QUERY",
             "INVALID_COURIER_PAYOUT_QUERY",

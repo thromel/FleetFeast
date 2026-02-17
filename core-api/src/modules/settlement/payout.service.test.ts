@@ -37,3 +37,28 @@ test("generates payout batch and holds entities with unresolved exceptions", asy
   const generatedEvent = eventBus.events.find((event) => event.type === "payout.batch_generated.v1");
   assert.ok(generatedEvent);
 });
+
+test("reuses existing payout batch for same schedule run and avoids duplicate events", async () => {
+  const eventBus = new InMemoryEventBus();
+  const payoutService = new PayoutService(new InMemoryPayoutBatchRepository(), eventBus);
+  const input = {
+    scheduleId: "daily-0900",
+    runAt: "2026-02-16T09:00:00Z",
+    candidates: [
+      {
+        entityType: "MERCHANT" as const,
+        entityId: "merchant-1",
+        amount: 1200,
+        hasException: false,
+      },
+    ],
+  };
+
+  const first = await payoutService.generateBatch(input);
+  const second = await payoutService.generateBatch(input);
+
+  assert.equal(second.payoutBatchId, first.payoutBatchId);
+
+  const generatedEvents = eventBus.events.filter((event) => event.type === "payout.batch_generated.v1");
+  assert.equal(generatedEvents.length, 1);
+});

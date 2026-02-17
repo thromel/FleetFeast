@@ -11,6 +11,24 @@ export class PayoutService {
   ) {}
 
   async generateBatch(input: GeneratePayoutBatchInput): Promise<PayoutBatch> {
+    const result = await this.runScheduledBatch(input);
+    return result.batch;
+  }
+
+  async runScheduledBatch(
+    input: GeneratePayoutBatchInput,
+  ): Promise<{ batch: PayoutBatch; created: boolean }> {
+    const existing = await this.payoutBatchRepository.findByScheduleRun(
+      input.scheduleId,
+      input.runAt,
+    );
+    if (existing) {
+      return {
+        batch: existing,
+        created: false,
+      };
+    }
+
     const createdAt = new Date().toISOString();
     const batch: PayoutBatch = {
       payoutBatchId: randomUUID(),
@@ -50,6 +68,9 @@ export class PayoutService {
       },
     });
 
-    return batch;
+    return {
+      batch,
+      created: true,
+    };
   }
 }
