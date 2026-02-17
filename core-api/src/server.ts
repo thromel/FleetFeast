@@ -1548,6 +1548,7 @@ export function createServer() {
       const consumerOrderTimelineRouteMatch = pathname.match(
         /^\/api\/v1\/consumer\/orders\/([^/]+)\/timeline$/,
       );
+      const consumerOrderRouteMatch = pathname.match(/^\/api\/v1\/consumer\/orders\/([^/]+)$/);
       const consumerOrderCancelRouteMatch = pathname.match(
         /^\/api\/v1\/consumer\/orders\/([^/]+)\/cancel$/,
       );
@@ -1677,6 +1678,13 @@ export function createServer() {
         const input = validateCreateOrderPayload(payload);
         const order = await orderService.createOrder(input);
         sendJson(response, 201, order);
+        return;
+      }
+
+      if (request.method === "GET" && consumerOrderRouteMatch) {
+        const orderId = decodeURIComponent(consumerOrderRouteMatch[1] ?? "");
+        const order = await orderService.getOrder(orderId);
+        sendJson(response, 200, order);
         return;
       }
 
