@@ -11,7 +11,7 @@ export class InMemorySessionStore {
   private readonly byToken = new Map<string, RefreshSessionRecord>();
   private readonly tokenFamilies = new Map<string, Set<string>>();
 
-  save(record: RefreshSessionRecord): void {
+  async save(record: RefreshSessionRecord): Promise<void> {
     this.byToken.set(record.token, record);
 
     const family = this.tokenFamilies.get(record.familyId) ?? new Set<string>();
@@ -19,11 +19,11 @@ export class InMemorySessionStore {
     this.tokenFamilies.set(record.familyId, family);
   }
 
-  get(token: string): RefreshSessionRecord | null {
+  async get(token: string): Promise<RefreshSessionRecord | null> {
     return this.byToken.get(token) ?? null;
   }
 
-  markUsed(token: string): void {
+  async markUsed(token: string): Promise<void> {
     const record = this.byToken.get(token);
     if (!record) {
       return;
@@ -33,7 +33,7 @@ export class InMemorySessionStore {
     this.byToken.set(token, record);
   }
 
-  revokeFamily(familyId: string): void {
+  async revokeFamily(familyId: string): Promise<void> {
     const tokens = this.tokenFamilies.get(familyId);
     if (!tokens) {
       return;

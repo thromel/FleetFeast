@@ -4,6 +4,22 @@ import {
   type ServerResponse,
 } from "node:http";
 
+import type { EventBroker } from "./platform/broker/event-broker.js";
+import { RedisEventBroker } from "./platform/broker/redis-event-broker.js";
+import { DurableEventBus } from "./platform/events/durable-event-bus.js";
+import type { DocumentStore } from "./platform/persistence/document-store.js";
+import { PostgresDocumentStore } from "./platform/persistence/postgres-document-store.js";
+import { PersistentSessionStore } from "./platform/persistence/repositories/persistent-session-store.js";
+import { PersistentIdentityRepository } from "./platform/persistence/repositories/persistent-identity-repository.js";
+import { PersistentBasketRepository } from "./platform/persistence/repositories/persistent-basket-repository.js";
+import { PersistentCheckoutRepository } from "./platform/persistence/repositories/persistent-checkout-repository.js";
+import { PersistentQuoteRepository } from "./platform/persistence/repositories/persistent-quote-repository.js";
+import { PersistentMenuRepository } from "./platform/persistence/repositories/persistent-menu-repository.js";
+import { PersistentItemAvailabilityRepository } from "./platform/persistence/repositories/persistent-item-availability-repository.js";
+import { PersistentStoreStatusRepository } from "./platform/persistence/repositories/persistent-store-status-repository.js";
+import { PersistentOrderRepository } from "./platform/persistence/repositories/persistent-order-repository.js";
+import { PersistentCourierJobRepository } from "./platform/persistence/repositories/persistent-courier-job-repository.js";
+
 import { AuthError, AuthService } from "./modules/identity/auth-service.js";
 import {
   BasketItemUnavailableError,
@@ -160,6 +176,42 @@ const supportedRoles: UserRole[] = [
   "finance_ops",
   "system_admin",
 ];
+
+export interface CreateServerOptions {
+  enablePersistence?: boolean;
+  documentStore?: DocumentStore;
+  eventBroker?: EventBroker;
+}
+
+function resolveDocumentStore(options: CreateServerOptions): DocumentStore | undefined {
+  if (options.documentStore) {
+    return options.documentStore;
+  }
+
+  if (process.env.PERSISTENCE_MODE !== "postgres") {
+    return undefined;
+  }
+
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString || connectionString.trim().length === 0) {
+    throw new Error("DATABASE_URL_REQUIRED_FOR_POSTGRES_PERSISTENCE");
+  }
+
+  return new PostgresDocumentStore(connectionString);
+}
+
+function resolveEventBroker(options: CreateServerOptions): EventBroker | undefined {
+  if (options.eventBroker) {
+    return options.eventBroker;
+  }
+
+  if (process.env.BROKER_MODE !== "redis") {
+    return undefined;
+  }
+
+  const redisUrl = process.env.REDIS_URL ?? "redis://127.0.0.1:6379";
+  return new RedisEventBroker(redisUrl);
+}
 
 function sendJson(
   response: ServerResponse,
@@ -1588,38 +1640,65 @@ function extractBearerToken(request: IncomingMessage): string {
   return authorization.replace("Bearer ", "").trim();
 }
 
-export function createServer() {
-  const repository = new InMemoryIdentityRepository();
-  const eventBus = new InMemoryEventBus();
+export function createServer(options: CreateServerOptions = {}) {
+  const documentStore = resolveDocumentStore(options);
+  const persistenceEnabled = options.enablePersistence ?? Boolean(documentStore);
+  if (persistenceEnabled && !documentStore) {
+    throw new Error("PERSISTENCE_ENABLED_REQUIRES_DOCUMENT_STORE");
+  }
+
+  const eventBroker = resolveEventBroker(options);
+  const eventBus = persistenceEnabled
+    ? new DurableEventBus(documentStore, eventBroker)
+    : new InMemoryEventBus();
+  const repository = persistenceEnabled
+    ? new PersistentIdentityRepository(documentStore!)
+    : new InMemoryIdentityRepository();
   const observabilityService = new ObservabilityService(
     new InMemoryStructuredLogRepository(),
     eventBus,
   );
   const sloService = new SLOService(eventBus);
   const identityService = new IdentityService(repository, eventBus);
-  const sessionStore = new InMemorySessionStore();
+  const sessionStore = persistenceEnabled
+    ? new PersistentSessionStore(documentStore!)
+    : new InMemorySessionStore();
   const authService = new AuthService(
     repository,
     eventBus,
     sessionStore,
     process.env.JWT_SECRET ?? "dev-jwt-secret",
   );
-  const menuRepository = new InMemoryMenuRepository();
+  const menuRepository = persistenceEnabled
+    ? new PersistentMenuRepository(documentStore!)
+    : new InMemoryMenuRepository();
   const menuService = new MenuService(menuRepository);
   const prepTimeService = new PrepTimeService(menuRepository);
-  const storeStatusRepository = new InMemoryStoreStatusRepository();
+  const storeStatusRepository = persistenceEnabled
+    ? new PersistentStoreStatusRepository(documentStore!)
+    : new InMemoryStoreStatusRepository();
   const storeStatusService = new StoreStatusService(storeStatusRepository);
   const storeDiscoveryService = new StoreDiscoveryService(menuRepository, storeStatusService);
-  const itemAvailabilityRepository = new InMemoryItemAvailabilityRepository();
+  const itemAvailabilityRepository = persistenceEnabled
+    ? new PersistentItemAvailabilityRepository(documentStore!)
+    : new InMemoryItemAvailabilityRepository();
   const itemAvailabilityService = new ItemAvailabilityService(itemAvailabilityRepository);
   const storeMenuService = new StoreMenuService(menuRepository, itemAvailabilityRepository);
-  const basketRepository = new InMemoryBasketRepository();
+  const basketRepository = persistenceEnabled
+    ? new PersistentBasketRepository(documentStore!)
+    : new InMemoryBasketRepository();
   const basketService = new BasketService(basketRepository, itemAvailabilityService);
-  const quoteRepository = new InMemoryQuoteRepository();
-  const checkoutRepository = new InMemoryCheckoutRepository();
+  const quoteRepository = persistenceEnabled
+    ? new PersistentQuoteRepository(documentStore!)
+    : new InMemoryQuoteRepository();
+  const checkoutRepository = persistenceEnabled
+    ? new PersistentCheckoutRepository(documentStore!)
+    : new InMemoryCheckoutRepository();
   const quoteService = new QuoteService(basketRepository, quoteRepository);
   const checkoutService = new CheckoutService(quoteRepository, checkoutRepository);
-  const orderRepository = new InMemoryOrderRepository();
+  const orderRepository = persistenceEnabled
+    ? new PersistentOrderRepository(documentStore!)
+    : new InMemoryOrderRepository();
   const orderTimelineRepository = new InMemoryOrderTimelineRepository();
   const orderTimelineService = new OrderTimelineService(eventBus, orderTimelineRepository);
   const orderService = new OrderService(
@@ -1631,7 +1710,9 @@ export function createServer() {
   );
   const courierJobService = new CourierJobService(
     orderRepository,
-    new InMemoryCourierJobRepository(),
+    persistenceEnabled
+      ? new PersistentCourierJobRepository(documentStore!)
+      : new InMemoryCourierJobRepository(),
   );
   const courierTelemetryService = new CourierTelemetryService();
   const paymentIntentRepository = new InMemoryPaymentIntentRepository();

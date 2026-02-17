@@ -10,8 +10,13 @@
     "dev": "node --watch --loader ts-node/esm src/main.ts",
     "test": "npm run build && node --test --test-concurrency=1 \"dist/**/*.test.js\""
   },
+  "dependencies": {
+    "pg": "^8.13.1",
+    "redis": "^4.7.0"
+  },
   "devDependencies": {
     "@types/node": "^24.10.13",
+    "@types/pg": "^8.11.11",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
   }

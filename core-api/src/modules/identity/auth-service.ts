@@ -105,7 +105,7 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string): Promise<SessionTokens> {
-    const record = this.sessionStore.get(refreshToken);
+    const record = await this.sessionStore.get(refreshToken);
     if (!record) {
       throw new AuthError(
         "IDENTITY_INVALID_REFRESH_TOKEN",
@@ -122,14 +122,14 @@ export class AuthService {
     }
 
     if (record.used) {
-      this.sessionStore.revokeFamily(record.familyId);
+      await this.sessionStore.revokeFamily(record.familyId);
       throw new AuthError(
         "IDENTITY_REFRESH_REPLAY_DETECTED",
         "Refresh token replay detected.",
       );
     }
 
-    this.sessionStore.markUsed(record.token);
+    await this.sessionStore.markUsed(record.token);
 
     const user = await this.repository.findById(record.userId);
     if (!user) {
@@ -177,11 +177,11 @@ export class AuthService {
     return claims;
   }
 
-  private issueSession(
+  private async issueSession(
     user: IdentityUser,
     reason: "login" | "refresh",
     familyId: string = randomUUID(),
-  ): SessionTokens {
+  ): Promise<SessionTokens> {
     const now = Math.floor(Date.now() / 1000);
     const accessToken = signJwt(
       {
@@ -195,7 +195,7 @@ export class AuthService {
     );
 
     const refreshToken = base64Url(randomBytes(48));
-    this.sessionStore.save({
+    await this.sessionStore.save({
       token: refreshToken,
       userId: user.id,
       familyId,
