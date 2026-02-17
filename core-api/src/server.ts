@@ -40,6 +40,10 @@ import { ItemAvailabilityService } from "./modules/merchant-catalog/item-availab
 import { MenuNotFoundError, MenuService } from "./modules/merchant-catalog/menu-service.js";
 import { PrepTimeService } from "./modules/merchant-catalog/prep-time-service.js";
 import { StoreDiscoveryService } from "./modules/merchant-catalog/store-discovery-service.js";
+import {
+  StoreMenuNotFoundError,
+  StoreMenuService,
+} from "./modules/merchant-catalog/store-menu-service.js";
 import { StoreStatusService } from "./modules/merchant-catalog/store-status-service.js";
 import { InMemoryQuoteRepository } from "./modules/pricing-promotions/in-memory-quote-repository.js";
 import { QuoteBasketNotFoundError, QuoteService } from "./modules/pricing-promotions/quote-service.js";
@@ -405,6 +409,23 @@ function validateStoreDiscoveryQuery(searchParams: URLSearchParams): {
   return {
     orderable: orderableRaw === null ? undefined : orderableRaw === "true",
     at,
+  };
+}
+
+function validateStoreMenuQuery(searchParams: URLSearchParams): {
+  availableOnly?: boolean;
+} {
+  const availableOnlyRaw = searchParams.get("availableOnly");
+  if (
+    availableOnlyRaw !== null &&
+    availableOnlyRaw !== "true" &&
+    availableOnlyRaw !== "false"
+  ) {
+    throw new Error("INVALID_STORE_MENU_QUERY");
+  }
+
+  return {
+    availableOnly: availableOnlyRaw === null ? undefined : availableOnlyRaw === "true",
   };
 }
 
@@ -1591,6 +1612,7 @@ export function createServer() {
   const storeDiscoveryService = new StoreDiscoveryService(menuRepository, storeStatusService);
   const itemAvailabilityRepository = new InMemoryItemAvailabilityRepository();
   const itemAvailabilityService = new ItemAvailabilityService(itemAvailabilityRepository);
+  const storeMenuService = new StoreMenuService(menuRepository, itemAvailabilityRepository);
   const basketRepository = new InMemoryBasketRepository();
   const basketService = new BasketService(basketRepository, itemAvailabilityService);
   const quoteRepository = new InMemoryQuoteRepository();
@@ -1720,6 +1742,9 @@ export function createServer() {
       );
       const storeStatusRouteMatch = pathname.match(
         /^\/api\/v1\/merchant\/stores\/([^/]+)\/status$/,
+      );
+      const consumerStoreMenuRouteMatch = pathname.match(
+        /^\/api\/v1\/consumer\/stores\/([^/]+)\/menu$/,
       );
       const storeOrderabilityRouteMatch = pathname.match(
         /^\/internal\/catalog\/stores\/([^/]+)\/orderability$/,
@@ -1868,6 +1893,14 @@ export function createServer() {
         const query = validateStoreDiscoveryQuery(requestUrl.searchParams);
         const stores = await storeDiscoveryService.listStores(query);
         sendJson(response, 200, { stores });
+        return;
+      }
+
+      if (request.method === "GET" && consumerStoreMenuRouteMatch) {
+        const storeId = decodeURIComponent(consumerStoreMenuRouteMatch[1] ?? "");
+        const query = validateStoreMenuQuery(requestUrl.searchParams);
+        const menu = await storeMenuService.getStoreMenu(storeId, query);
+        sendJson(response, 200, menu);
         return;
       }
 
@@ -2458,6 +2491,14 @@ export function createServer() {
         return;
       }
 
+      if (error instanceof StoreMenuNotFoundError) {
+        sendJson(response, 404, {
+          errorCode: error.code,
+          message: error.message,
+        });
+        return;
+      }
+
       if (error instanceof BasketNotFoundError) {
         sendJson(response, 404, {
           errorCode: error.code,
@@ -2640,6 +2681,7 @@ export function createServer() {
             "INVALID_MENU_UPDATE_PAYLOAD",
             "INVALID_STORE_STATUS_PAYLOAD",
             "INVALID_STORE_DISCOVERY_QUERY",
+            "INVALID_STORE_MENU_QUERY",
             "INVALID_ORDERABILITY_QUERY",
             "INVALID_ITEM_AVAILABILITY_PAYLOAD",
             "INVALID_BASKET_CREATE_PAYLOAD",
