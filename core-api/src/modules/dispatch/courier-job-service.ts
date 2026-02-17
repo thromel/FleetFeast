@@ -11,6 +11,15 @@ export class CourierJobNotFoundError extends Error {
   }
 }
 
+export class CourierJobStateConflictError extends Error {
+  code = "COURIER_JOB_STATE_CONFLICT";
+
+  constructor(jobId: string, message: string) {
+    super(`Courier job '${jobId}' state conflict: ${message}`);
+    this.name = "CourierJobStateConflictError";
+  }
+}
+
 export class CourierJobService {
   constructor(
     private readonly orderRepository: InMemoryOrderRepository,
@@ -26,6 +35,17 @@ export class CourierJobService {
   async acceptJob(jobId: string, courierId: string): Promise<CourierJob> {
     await this.syncDispatchPendingOrders();
     const job = await this.requireJob(jobId);
+
+    if (job.status === "ACCEPTED" && job.courierId === courierId) {
+      return job;
+    }
+
+    if (job.status !== "AVAILABLE") {
+      throw new CourierJobStateConflictError(
+        jobId,
+        `expected AVAILABLE, received ${job.status}`,
+      );
+    }
 
     if (job.status === "AVAILABLE") {
       const updated: CourierJob = {
@@ -45,34 +65,62 @@ export class CourierJobService {
     await this.syncDispatchPendingOrders();
     const job = await this.requireJob(jobId);
 
-    if (job.status === "ACCEPTED" && job.courierId === courierId) {
-      const updated: CourierJob = {
-        ...job,
-        status: "PICKED_UP",
-        pickedUpAt: new Date().toISOString(),
-      };
-      await this.jobRepository.save(updated);
-      return updated;
+    if (job.status === "PICKED_UP" && job.courierId === courierId) {
+      return job;
     }
 
-    return job;
+    if (job.status !== "ACCEPTED") {
+      throw new CourierJobStateConflictError(
+        jobId,
+        `expected ACCEPTED, received ${job.status}`,
+      );
+    }
+
+    if (job.courierId !== courierId) {
+      throw new CourierJobStateConflictError(
+        jobId,
+        `courier mismatch: expected ${job.courierId ?? "none"}, received ${courierId}`,
+      );
+    }
+
+    const updated: CourierJob = {
+      ...job,
+      status: "PICKED_UP",
+      pickedUpAt: new Date().toISOString(),
+    };
+    await this.jobRepository.save(updated);
+    return updated;
   }
 
   async dropoffJob(jobId: string, courierId: string): Promise<CourierJob> {
     await this.syncDispatchPendingOrders();
     const job = await this.requireJob(jobId);
 
-    if (job.status === "PICKED_UP" && job.courierId === courierId) {
-      const updated: CourierJob = {
-        ...job,
-        status: "DROPPED_OFF",
-        droppedOffAt: new Date().toISOString(),
-      };
-      await this.jobRepository.save(updated);
-      return updated;
+    if (job.status === "DROPPED_OFF" && job.courierId === courierId) {
+      return job;
     }
 
-    return job;
+    if (job.status !== "PICKED_UP") {
+      throw new CourierJobStateConflictError(
+        jobId,
+        `expected PICKED_UP, received ${job.status}`,
+      );
+    }
+
+    if (job.courierId !== courierId) {
+      throw new CourierJobStateConflictError(
+        jobId,
+        `courier mismatch: expected ${job.courierId ?? "none"}, received ${courierId}`,
+      );
+    }
+
+    const updated: CourierJob = {
+      ...job,
+      status: "DROPPED_OFF",
+      droppedOffAt: new Date().toISOString(),
+    };
+    await this.jobRepository.save(updated);
+    return updated;
   }
 
   private async requireJob(jobId: string): Promise<CourierJob> {

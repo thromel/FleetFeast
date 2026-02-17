@@ -207,3 +207,64 @@ test("courier job routes return 404 for unknown job id", async () => {
     listener.close();
   }
 });
+
+test("courier job pickup rejects wrong courier for accepted job", async () => {
+  const app = createServer();
+  const listener = app.listen(0);
+
+  try {
+    const address = listener.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind test listener");
+    }
+
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const order = await createDispatchPendingOrder(baseUrl);
+
+    const acceptResponse = await fetch(`${baseUrl}/api/v1/courier/jobs/${order.id}/accept`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courierId: "courier-1" }),
+    });
+    assert.equal(acceptResponse.status, 200);
+
+    const pickupResponse = await fetch(`${baseUrl}/api/v1/courier/jobs/${order.id}/pickup`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courierId: "courier-2" }),
+    });
+    assert.equal(pickupResponse.status, 409);
+
+    const payload = (await pickupResponse.json()) as { errorCode: string };
+    assert.equal(payload.errorCode, "COURIER_JOB_STATE_CONFLICT");
+  } finally {
+    listener.close();
+  }
+});
+
+test("courier job dropoff rejects out-of-sequence transition", async () => {
+  const app = createServer();
+  const listener = app.listen(0);
+
+  try {
+    const address = listener.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind test listener");
+    }
+
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const order = await createDispatchPendingOrder(baseUrl);
+
+    const dropoffResponse = await fetch(`${baseUrl}/api/v1/courier/jobs/${order.id}/dropoff`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courierId: "courier-1" }),
+    });
+    assert.equal(dropoffResponse.status, 409);
+
+    const payload = (await dropoffResponse.json()) as { errorCode: string };
+    assert.equal(payload.errorCode, "COURIER_JOB_STATE_CONFLICT");
+  } finally {
+    listener.close();
+  }
+});

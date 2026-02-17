@@ -66,6 +66,7 @@ import { OrderTimelineService } from "./modules/order-orchestration/order-timeli
 import { InMemoryCourierJobRepository } from "./modules/dispatch/in-memory-courier-job-repository.js";
 import {
   CourierJobNotFoundError,
+  CourierJobStateConflictError,
   CourierJobService,
 } from "./modules/dispatch/courier-job-service.js";
 import { CourierTelemetryService } from "./modules/dispatch/courier-telemetry-service.js";
@@ -2433,6 +2434,14 @@ export function createServer() {
 
       if (error instanceof CourierJobNotFoundError) {
         sendJson(response, 404, {
+          errorCode: error.code,
+          message: error.message,
+        });
+        return;
+      }
+
+      if (error instanceof CourierJobStateConflictError) {
+        sendJson(response, 409, {
           errorCode: error.code,
           message: error.message,
         });
