@@ -713,35 +713,56 @@ function validateMerchantOrderRejectPayload(payload: Record<string, unknown>): {
   };
 }
 
+const validOrderStatuses: OrderStatus[] = [
+  "CREATED",
+  "MERCHANT_ACCEPTED",
+  "DISPATCH_PENDING",
+  "COURIER_ASSIGNED",
+  "PICKED_UP",
+  "DELIVERED",
+  "CANCELLED",
+];
+
+function parseOptionalOrderStatus(status: string | null): OrderStatus | undefined {
+  if (status === null) {
+    return undefined;
+  }
+
+  if (!validOrderStatuses.includes(status as OrderStatus)) {
+    throw new Error("INVALID_ORDER_STATUS_QUERY");
+  }
+
+  return status as OrderStatus;
+}
+
+function validateConsumerOrderListQuery(searchParams: URLSearchParams): {
+  consumerId: string;
+  status?: OrderStatus;
+} {
+  const consumerId = searchParams.get("consumerId");
+  if (!consumerId || consumerId.trim().length === 0) {
+    throw new Error("INVALID_CONSUMER_ORDER_QUERY");
+  }
+
+  return {
+    consumerId: consumerId.trim(),
+    status: parseOptionalOrderStatus(searchParams.get("status")),
+  };
+}
+
 function validateMerchantOrderListQuery(searchParams: URLSearchParams): {
   merchantId: string;
   status?: OrderStatus;
 } {
   const merchantId = searchParams.get("merchantId");
-  const status = searchParams.get("status");
 
   if (!merchantId || merchantId.trim().length === 0) {
     throw new Error("INVALID_MERCHANT_ORDER_QUERY");
   }
 
-  if (
-    status !== null &&
-    ![
-      "CREATED",
-      "MERCHANT_ACCEPTED",
-      "DISPATCH_PENDING",
-      "COURIER_ASSIGNED",
-      "PICKED_UP",
-      "DELIVERED",
-      "CANCELLED",
-    ].includes(status)
-  ) {
-    throw new Error("INVALID_MERCHANT_ORDER_QUERY");
-  }
-
   return {
     merchantId: merchantId.trim(),
-    status: status === null ? undefined : (status as OrderStatus),
+    status: parseOptionalOrderStatus(searchParams.get("status")),
   };
 }
 
@@ -1845,6 +1866,13 @@ export function createServer() {
         return;
       }
 
+      if (request.method === "GET" && pathname === "/api/v1/consumer/orders") {
+        const query = validateConsumerOrderListQuery(requestUrl.searchParams);
+        const orders = await orderService.listOrders(query);
+        sendJson(response, 200, { orders });
+        return;
+      }
+
       if (request.method === "GET" && consumerOrderRouteMatch) {
         const orderId = decodeURIComponent(consumerOrderRouteMatch[1] ?? "");
         const order = await orderService.getOrder(orderId);
@@ -2587,6 +2615,8 @@ export function createServer() {
             "INVALID_CHECKOUT_PAYLOAD",
             "INVALID_ORDER_CREATE_PAYLOAD",
             "INVALID_ORDER_CANCELLATION_PAYLOAD",
+            "INVALID_CONSUMER_ORDER_QUERY",
+            "INVALID_ORDER_STATUS_QUERY",
             "INVALID_MERCHANT_ORDER_REJECT_PAYLOAD",
             "INVALID_MERCHANT_ORDER_QUERY",
             "INVALID_COURIER_JOB_COURIER_PAYLOAD",

@@ -350,9 +350,16 @@ export class OrderService {
     return updated;
   }
 
-  async listOrders(input?: { merchantId?: string; status?: OrderStatus }): Promise<Order[]> {
+  async listOrders(input?: {
+    consumerId?: string;
+    merchantId?: string;
+    status?: OrderStatus;
+  }): Promise<Order[]> {
     const orders = await this.orderRepository.list();
     return orders.filter((order) => {
+      if (input?.consumerId && order.consumerId !== input.consumerId) {
+        return false;
+      }
       if (input?.merchantId && order.merchantId !== input.merchantId) {
         return false;
       }
