@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://foodpanda.dev/contracts/events/v1/payment.captured.v1.schema.json",
+  "title": "payment.captured.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "occurredAt",
+    "producer",
+    "idempotencyKey",
+    "correlationId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "const": "payment.captured.v1"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "producer": {
+      "type": "string"
+    },
+    "idempotencyKey": {
+      "type": "string"
+    },
+    "correlationId": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "orderId",
+        "paymentIntentId",
+        "capturedAmount"
+      ],
+      "properties": {
+        "orderId": {
+          "type": "string"
+        },
+        "paymentIntentId": {
+          "type": "string"
+        },
+        "capturedAmount": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "amount",
+            "currency"
+          ],
+          "properties": {
+            "amount": {
+              "type": "number"
+            },
+            "currency": {
+              "type": "string"
+            }
+          }
+        },
+        "captureSequence": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

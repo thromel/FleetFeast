@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://foodpanda.dev/contracts/events/v1/settlement.generated.v1.schema.json",
+  "title": "settlement.generated.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "occurredAt",
+    "producer",
+    "idempotencyKey",
+    "correlationId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "const": "settlement.generated.v1"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "producer": {
+      "type": "string"
+    },
+    "idempotencyKey": {
+      "type": "string"
+    },
+    "correlationId": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "settlementRecordId",
+        "orderId",
+        "balances"
+      ],
+      "properties": {
+        "settlementRecordId": {
+          "type": "string"
+        },
+        "orderId": {
+          "type": "string"
+        },
+        "balances": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "merchantNet",
+            "courierNet",
+            "platformFee"
+          ],
+          "properties": {
+            "merchantNet": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "amount",
+                "currency"
+              ],
+              "properties": {
+                "amount": {
+                  "type": "number"
+                },
+                "currency": {
+                  "type": "string"
+                }
+              }
+            },
+            "courierNet": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "amount",
+                "currency"
+              ],
+              "properties": {
+                "amount": {
+                  "type": "number"
+                },
+                "currency": {
+                  "type": "string"
+                }
+              }
+            },
+            "platformFee": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "amount",
+                "currency"
+              ],
+              "properties": {
+                "amount": {
+                  "type": "number"
+                },
+                "currency": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

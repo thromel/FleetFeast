@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://foodpanda.dev/contracts/events/v1/dispatch.assignment.requested.v1.schema.json",
+  "title": "dispatch.assignment.requested.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "occurredAt",
+    "producer",
+    "idempotencyKey",
+    "correlationId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "const": "dispatch.assignment.requested.v1"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "producer": {
+      "type": "string"
+    },
+    "idempotencyKey": {
+      "type": "string"
+    },
+    "correlationId": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "orderId",
+        "pickup",
+        "dropoff",
+        "slaDeadline"
+      ],
+      "properties": {
+        "orderId": {
+          "type": "string"
+        },
+        "pickup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "latitude",
+            "longitude"
+          ],
+          "properties": {
+            "latitude": {
+              "type": "number"
+            },
+            "longitude": {
+              "type": "number"
+            }
+          }
+        },
+        "dropoff": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "latitude",
+            "longitude"
+          ],
+          "properties": {
+            "latitude": {
+              "type": "number"
+            },
+            "longitude": {
+              "type": "number"
+            }
+          }
+        },
+        "slaDeadline": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

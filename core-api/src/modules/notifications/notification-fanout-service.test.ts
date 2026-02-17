@@ -42,3 +42,29 @@ test("fanout is idempotent for same channel/template/entity tuple", async () => 
   assert.equal(second.queued.length, 0);
   assert.equal(queueRepository.list().length, 1);
 });
+
+test("replaying the same order event does not enqueue duplicate notifications", async () => {
+  const eventBus = new InMemoryEventBus();
+  const queueRepository = new InMemoryNotificationQueueRepository();
+  const fanoutService = new NotificationFanoutService(queueRepository, eventBus);
+
+  const firstAttempt = await fanoutService.fanout({
+    eventType: "order.created.v1",
+    entityId: "order-77",
+    recipientId: "consumer-77",
+  });
+
+  const replayAttempt = await fanoutService.fanout({
+    eventType: "order.created.v1",
+    entityId: "order-77",
+    recipientId: "consumer-77",
+  });
+
+  assert.equal(firstAttempt.queued.length, 2);
+  assert.equal(replayAttempt.queued.length, 0);
+  assert.equal(queueRepository.list().length, 2);
+  assert.equal(
+    eventBus.events.filter((event) => event.type === "notification.queued.v1").length,
+    2,
+  );
+});

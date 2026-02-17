@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://foodpanda.dev/contracts/events/v1/order.confirmed.v1.schema.json",
+  "title": "order.confirmed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "occurredAt",
+    "producer",
+    "idempotencyKey",
+    "correlationId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "const": "order.confirmed.v1"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "producer": {
+      "type": "string"
+    },
+    "idempotencyKey": {
+      "type": "string"
+    },
+    "correlationId": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "orderId",
+        "confirmedAt"
+      ],
+      "properties": {
+        "orderId": {
+          "type": "string"
+        },
+        "confirmedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

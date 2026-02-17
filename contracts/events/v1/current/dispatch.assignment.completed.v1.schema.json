@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://foodpanda.dev/contracts/events/v1/dispatch.assignment.completed.v1.schema.json",
+  "title": "dispatch.assignment.completed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "occurredAt",
+    "producer",
+    "idempotencyKey",
+    "correlationId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "const": "dispatch.assignment.completed.v1"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "producer": {
+      "type": "string"
+    },
+    "idempotencyKey": {
+      "type": "string"
+    },
+    "correlationId": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "orderId",
+        "assignmentId",
+        "mode",
+        "eta"
+      ],
+      "properties": {
+        "orderId": {
+          "type": "string"
+        },
+        "assignmentId": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "eta": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reasonCodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
