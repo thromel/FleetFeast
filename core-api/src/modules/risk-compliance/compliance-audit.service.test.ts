@@ -59,3 +59,34 @@ test("generates compliance evidence report with chain integrity", async () => {
   const evidenceEvent = eventBus.events.find((event) => event.type === "platform.evidence_generated.v1");
   assert.ok(evidenceEvent);
 });
+
+test("emits critical alert and throws when audit append fails", async () => {
+  const eventBus = new InMemoryEventBus();
+
+  class FailingAuditRepository extends InMemoryComplianceAuditRepository {
+    override async append(): Promise<void> {
+      throw new Error("audit sink down");
+    }
+  }
+
+  const service = new ComplianceAuditService(new FailingAuditRepository(), eventBus);
+
+  await assert.rejects(
+    () =>
+      service.appendEvent({
+        actionType: "ADMIN_BREAK_GLASS",
+        actorId: "admin-1",
+        targetType: "ADMIN_ACTION",
+        targetId: "break-glass-2",
+        reasonCode: "INCIDENT_RESPONSE",
+        metadata: {},
+      }),
+    (error: unknown) =>
+      error instanceof Error && "code" in error && (error as { code?: string }).code === "COMPLIANCE_AUDIT_WRITE_FAILED",
+  );
+
+  const failureAlert = eventBus.events.find(
+    (event) => event.type === "platform.audit_write_failure_alert.v1",
+  );
+  assert.ok(failureAlert);
+});

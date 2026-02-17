@@ -9,6 +9,15 @@ import type {
   GenerateComplianceEvidenceInput,
 } from "./types.js";
 
+export class ComplianceAuditWriteError extends Error {
+  code = "COMPLIANCE_AUDIT_WRITE_FAILED";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "ComplianceAuditWriteError";
+  }
+}
+
 export class ComplianceAuditService {
   constructor(
     private readonly repository: InMemoryComplianceAuditRepository,
@@ -44,7 +53,24 @@ export class ComplianceAuditService {
       hash,
     };
 
-    await this.repository.append(event);
+    try {
+      await this.repository.append(event);
+    } catch (error) {
+      const failureMessage = error instanceof Error ? error.message : "Unknown audit write failure";
+      this.eventBus.publish({
+        type: "platform.audit_write_failure_alert.v1",
+        occurredAt: timestamp,
+        payload: {
+          actionType: event.actionType,
+          targetType: event.targetType,
+          targetId: event.targetId,
+          reasonCode: event.reasonCode,
+          failureMessage,
+        },
+      });
+      throw new ComplianceAuditWriteError(failureMessage);
+    }
+
     this.eventBus.publish({
       type: "risk.audit_log_appended.v1",
       occurredAt: timestamp,
