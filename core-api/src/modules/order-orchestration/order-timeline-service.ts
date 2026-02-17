@@ -12,6 +12,9 @@ const eventStatusMap: Record<string, string> = {
   "order.created.v1": "CREATED",
   "order.confirmed.v1": "MERCHANT_ACCEPTED",
   "dispatch.assignment.requested.v1": "DISPATCH_PENDING",
+  "dispatch.assignment.completed.v1": "COURIER_ASSIGNED",
+  "order.picked_up.v1": "PICKED_UP",
+  "order.delivered.v1": "DELIVERED",
   "order.cancel_requested.v1": "CANCEL_REQUESTED",
   "order.cancelled.v1": "CANCELLED",
 };

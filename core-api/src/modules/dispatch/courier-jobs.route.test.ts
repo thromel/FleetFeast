@@ -114,6 +114,15 @@ test("courier job lifecycle routes expose available jobs and progress status", a
     assert.equal(accepted.status, "ACCEPTED");
     assert.equal(accepted.courierId, "courier-1");
 
+    const orderAfterAcceptResponse = await fetch(`${baseUrl}/api/v1/consumer/orders/${order.id}`);
+    assert.equal(orderAfterAcceptResponse.status, 200);
+    const orderAfterAccept = (await orderAfterAcceptResponse.json()) as {
+      status: string;
+      courierId: string | null;
+    };
+    assert.equal(orderAfterAccept.status, "COURIER_ASSIGNED");
+    assert.equal(orderAfterAccept.courierId, "courier-1");
+
     const pickupResponse = await fetch(`${baseUrl}/api/v1/courier/jobs/${order.id}/pickup`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -123,6 +132,11 @@ test("courier job lifecycle routes expose available jobs and progress status", a
     const pickedUp = (await pickupResponse.json()) as { status: string };
     assert.equal(pickedUp.status, "PICKED_UP");
 
+    const orderAfterPickupResponse = await fetch(`${baseUrl}/api/v1/consumer/orders/${order.id}`);
+    assert.equal(orderAfterPickupResponse.status, 200);
+    const orderAfterPickup = (await orderAfterPickupResponse.json()) as { status: string };
+    assert.equal(orderAfterPickup.status, "PICKED_UP");
+
     const dropoffResponse = await fetch(`${baseUrl}/api/v1/courier/jobs/${order.id}/dropoff`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -131,6 +145,11 @@ test("courier job lifecycle routes expose available jobs and progress status", a
     assert.equal(dropoffResponse.status, 200);
     const droppedOff = (await dropoffResponse.json()) as { status: string };
     assert.equal(droppedOff.status, "DROPPED_OFF");
+
+    const orderAfterDropoffResponse = await fetch(`${baseUrl}/api/v1/consumer/orders/${order.id}`);
+    assert.equal(orderAfterDropoffResponse.status, 200);
+    const orderAfterDropoff = (await orderAfterDropoffResponse.json()) as { status: string };
+    assert.equal(orderAfterDropoff.status, "DELIVERED");
   } finally {
     listener.close();
   }

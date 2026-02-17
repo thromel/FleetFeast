@@ -1,4 +1,11 @@
-export type OrderStatus = "CREATED" | "MERCHANT_ACCEPTED" | "DISPATCH_PENDING" | "CANCELLED";
+export type OrderStatus =
+  | "CREATED"
+  | "MERCHANT_ACCEPTED"
+  | "DISPATCH_PENDING"
+  | "COURIER_ASSIGNED"
+  | "PICKED_UP"
+  | "DELIVERED"
+  | "CANCELLED";
 
 export interface Order {
   id: string;
@@ -6,6 +13,7 @@ export interface Order {
   quoteHash: string;
   consumerId: string | null;
   merchantId: string | null;
+  courierId: string | null;
   status: OrderStatus;
   cancellationReason: string | null;
   cancelledBy: string | null;

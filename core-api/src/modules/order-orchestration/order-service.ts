@@ -52,9 +52,9 @@ export class CancellationNotAllowedError extends Error {
 
 const cancellationPolicy: Record<CancellationActor, ReadonlySet<OrderStatus>> = {
   consumer: new Set(["CREATED", "MERCHANT_ACCEPTED"]),
-  merchant_operator: new Set(["CREATED", "MERCHANT_ACCEPTED", "DISPATCH_PENDING"]),
-  support_agent: new Set(["CREATED", "MERCHANT_ACCEPTED", "DISPATCH_PENDING"]),
-  system_admin: new Set(["CREATED", "MERCHANT_ACCEPTED", "DISPATCH_PENDING"]),
+  merchant_operator: new Set(["CREATED", "MERCHANT_ACCEPTED", "DISPATCH_PENDING", "COURIER_ASSIGNED"]),
+  support_agent: new Set(["CREATED", "MERCHANT_ACCEPTED", "DISPATCH_PENDING", "COURIER_ASSIGNED"]),
+  system_admin: new Set(["CREATED", "MERCHANT_ACCEPTED", "DISPATCH_PENDING", "COURIER_ASSIGNED"]),
 };
 
 export class OrderService {
@@ -87,6 +87,7 @@ export class OrderService {
       quoteHash: input.quoteHash,
       consumerId: basket?.consumerId ?? null,
       merchantId: basket?.merchantId ?? null,
+      courierId: null,
       status: "CREATED",
       cancellationReason: null,
       cancelledBy: null,
@@ -119,6 +120,7 @@ export class OrderService {
     const updated: Order = {
       ...order,
       status: "MERCHANT_ACCEPTED",
+      courierId: null,
       cancellationReason: null,
       cancelledBy: null,
       updatedAt: new Date().toISOString(),
@@ -179,6 +181,7 @@ export class OrderService {
     const updated: Order = {
       ...order,
       status: "DISPATCH_PENDING",
+      courierId: null,
       updatedAt: new Date().toISOString(),
     };
 
@@ -189,6 +192,103 @@ export class OrderService {
       payload: {
         orderId: updated.id,
         checkoutId: updated.checkoutId,
+      },
+    });
+    return updated;
+  }
+
+  async assignCourier(orderId: string, courierId: string): Promise<Order> {
+    const order = await this.orderRepository.findById(orderId);
+    if (!order) {
+      throw new OrderNotFoundError(orderId);
+    }
+
+    if (order.status === "COURIER_ASSIGNED" && order.courierId === courierId) {
+      return order;
+    }
+
+    if (order.status !== "DISPATCH_PENDING") {
+      return order;
+    }
+
+    const updated: Order = {
+      ...order,
+      courierId,
+      status: "COURIER_ASSIGNED",
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.orderRepository.save(updated);
+    this.publishEvent({
+      type: "dispatch.assignment.completed.v1",
+      occurredAt: updated.updatedAt,
+      payload: {
+        orderId: updated.id,
+        courierId,
+      },
+    });
+    return updated;
+  }
+
+  async markPickedUp(orderId: string, courierId: string): Promise<Order> {
+    const order = await this.orderRepository.findById(orderId);
+    if (!order) {
+      throw new OrderNotFoundError(orderId);
+    }
+
+    if (order.status === "PICKED_UP" && order.courierId === courierId) {
+      return order;
+    }
+
+    if (order.status !== "COURIER_ASSIGNED" || order.courierId !== courierId) {
+      return order;
+    }
+
+    const updated: Order = {
+      ...order,
+      status: "PICKED_UP",
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.orderRepository.save(updated);
+    this.publishEvent({
+      type: "order.picked_up.v1",
+      occurredAt: updated.updatedAt,
+      payload: {
+        orderId: updated.id,
+        courierId,
+      },
+    });
+    return updated;
+  }
+
+  async markDelivered(orderId: string, courierId: string): Promise<Order> {
+    const order = await this.orderRepository.findById(orderId);
+    if (!order) {
+      throw new OrderNotFoundError(orderId);
+    }
+
+    if (order.status === "DELIVERED" && order.courierId === courierId) {
+      return order;
+    }
+
+    if (order.status !== "PICKED_UP" || order.courierId !== courierId) {
+      return order;
+    }
+
+    const updated: Order = {
+      ...order,
+      status: "DELIVERED",
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.orderRepository.save(updated);
+    this.publishEvent({
+      type: "order.delivered.v1",
+      occurredAt: updated.updatedAt,
+      payload: {
+        orderId: updated.id,
+        courierId,
       },
     });
     return updated;

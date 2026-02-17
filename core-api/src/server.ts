@@ -699,7 +699,15 @@ function validateMerchantOrderListQuery(searchParams: URLSearchParams): {
 
   if (
     status !== null &&
-    !["CREATED", "MERCHANT_ACCEPTED", "DISPATCH_PENDING", "CANCELLED"].includes(status)
+    ![
+      "CREATED",
+      "MERCHANT_ACCEPTED",
+      "DISPATCH_PENDING",
+      "COURIER_ASSIGNED",
+      "PICKED_UP",
+      "DELIVERED",
+      "CANCELLED",
+    ].includes(status)
   ) {
     throw new Error("INVALID_MERCHANT_ORDER_QUERY");
   }
@@ -1881,6 +1889,7 @@ export function createServer() {
         const input = validateCourierJobCourierPayload(payload);
         const jobId = decodeURIComponent(courierJobAcceptRouteMatch[1] ?? "");
         const job = await courierJobService.acceptJob(jobId, input.courierId);
+        await orderService.assignCourier(job.orderId, input.courierId);
         sendJson(response, 200, job);
         return;
       }
@@ -1890,6 +1899,7 @@ export function createServer() {
         const input = validateCourierJobCourierPayload(payload);
         const jobId = decodeURIComponent(courierJobPickupRouteMatch[1] ?? "");
         const job = await courierJobService.pickupJob(jobId, input.courierId);
+        await orderService.markPickedUp(job.orderId, input.courierId);
         sendJson(response, 200, job);
         return;
       }
@@ -1899,6 +1909,7 @@ export function createServer() {
         const input = validateCourierJobCourierPayload(payload);
         const jobId = decodeURIComponent(courierJobDropoffRouteMatch[1] ?? "");
         const job = await courierJobService.dropoffJob(jobId, input.courierId);
+        await orderService.markDelivered(job.orderId, input.courierId);
         sendJson(response, 200, job);
         return;
       }
