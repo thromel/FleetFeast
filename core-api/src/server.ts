@@ -87,6 +87,11 @@ import {
   SupportTicketService,
 } from "./modules/support/support-ticket-service.js";
 import { InMemoryRiskPolicyRepository } from "./modules/risk-compliance/in-memory-risk-policy-repository.js";
+import { InMemoryManualReviewRepository } from "./modules/risk-compliance/in-memory-manual-review-repository.js";
+import {
+  ManualReviewNotFoundError,
+  ManualReviewService,
+} from "./modules/risk-compliance/manual-review-service.js";
 import { RiskPolicyService } from "./modules/risk-compliance/risk-policy-service.js";
 import {
   SettlementLedgerService,
@@ -112,7 +117,11 @@ import type {
   ExecuteSupportInterventionInput,
   SupportInterventionActionType,
 } from "./modules/support/types.js";
-import type { EvaluateRiskPolicyInput } from "./modules/risk-compliance/types.js";
+import type {
+  EvaluateRiskPolicyInput,
+  QueueManualReviewInput,
+  ResolveManualReviewInput,
+} from "./modules/risk-compliance/types.js";
 import type {
   HandleNotificationFailureInput,
   NotificationActorType,
@@ -1198,6 +1207,71 @@ function validateRiskPolicyEvaluatePayload(
   };
 }
 
+function validateQueueManualReviewPayload(
+  payload: Record<string, unknown>,
+): QueueManualReviewInput {
+  const entityType = payload.entityType;
+  const entityId = payload.entityId;
+  const orderId = payload.orderId;
+  const amountCents = payload.amountCents;
+  const reasonCode = payload.reasonCode;
+  const requestedBy = payload.requestedBy;
+
+  if (
+    typeof entityType !== "string" ||
+    !["REFUND", "PAYOUT"].includes(entityType) ||
+    typeof entityId !== "string" ||
+    entityId.trim().length === 0 ||
+    (orderId !== undefined && typeof orderId !== "string") ||
+    typeof amountCents !== "number" ||
+    amountCents < 0 ||
+    !Number.isFinite(amountCents) ||
+    typeof reasonCode !== "string" ||
+    reasonCode.trim().length === 0 ||
+    typeof requestedBy !== "string" ||
+    requestedBy.trim().length === 0
+  ) {
+    throw new Error("INVALID_MANUAL_REVIEW_QUEUE_PAYLOAD");
+  }
+
+  return {
+    entityType: entityType as QueueManualReviewInput["entityType"],
+    entityId,
+    orderId: orderId as string | undefined,
+    amountCents,
+    reasonCode,
+    requestedBy,
+  };
+}
+
+function validateResolveManualReviewPayload(
+  reviewId: string,
+  payload: Record<string, unknown>,
+): ResolveManualReviewInput {
+  const decision = payload.decision;
+  const resolvedBy = payload.resolvedBy;
+  const note = payload.note;
+
+  if (
+    typeof reviewId !== "string" ||
+    reviewId.trim().length === 0 ||
+    typeof decision !== "string" ||
+    !["APPROVE", "REJECT"].includes(decision) ||
+    typeof resolvedBy !== "string" ||
+    resolvedBy.trim().length === 0 ||
+    (note !== undefined && typeof note !== "string")
+  ) {
+    throw new Error("INVALID_MANUAL_REVIEW_RESOLVE_PAYLOAD");
+  }
+
+  return {
+    reviewId,
+    decision: decision as ResolveManualReviewInput["decision"],
+    resolvedBy,
+    note: note as string | undefined,
+  };
+}
+
 function extractBearerToken(request: IncomingMessage): string {
   const authorization = request.headers.authorization;
   if (!authorization || !authorization.startsWith("Bearer ")) {
@@ -1284,6 +1358,10 @@ export function createServer() {
     eventBus,
   );
   const riskPolicyService = new RiskPolicyService(new InMemoryRiskPolicyRepository(), eventBus);
+  const manualReviewService = new ManualReviewService(
+    new InMemoryManualReviewRepository(),
+    eventBus,
+  );
   const settlementLedgerService = new SettlementLedgerService(
     new InMemorySettlementLedgerRepository(),
     eventBus,
@@ -1359,6 +1437,9 @@ export function createServer() {
       const paymentAuditRouteMatch = pathname.match(/^\/internal\/payments\/audit\/([^/]+)$/);
       const supportTicketTimelineRouteMatch = pathname.match(
         /^\/api\/v1\/support\/tickets\/([^/]+)\/timeline$/,
+      );
+      const manualReviewResolveRouteMatch = pathname.match(
+        /^\/api\/v1\/admin\/risk\/reviews\/([^/]+)\/resolve$/,
       );
 
       if (request.method === "GET" && pathname === "/health") {
@@ -1549,6 +1630,23 @@ export function createServer() {
         const input = validateRiskPolicyEvaluatePayload(payload);
         const decision = await riskPolicyService.evaluate(input);
         sendJson(response, 200, decision);
+        return;
+      }
+
+      if (request.method === "POST" && pathname === "/internal/risk/manual-reviews") {
+        const payload = await parseJsonBody(request);
+        const input = validateQueueManualReviewPayload(payload);
+        const review = await manualReviewService.queueReview(input);
+        sendJson(response, 201, review);
+        return;
+      }
+
+      if (request.method === "POST" && manualReviewResolveRouteMatch) {
+        const payload = await parseJsonBody(request);
+        const reviewId = decodeURIComponent(manualReviewResolveRouteMatch[1] ?? "");
+        const input = validateResolveManualReviewPayload(reviewId, payload);
+        const review = await manualReviewService.resolveReview(input);
+        sendJson(response, 200, review);
         return;
       }
 
@@ -1898,6 +1996,14 @@ export function createServer() {
         return;
       }
 
+      if (error instanceof ManualReviewNotFoundError) {
+        sendJson(response, 404, {
+          errorCode: error.code,
+          message: error.message,
+        });
+        return;
+      }
+
       if (error instanceof PaymentOrderNotFoundError) {
         sendJson(response, 404, {
           errorCode: error.code,
@@ -2014,6 +2120,8 @@ export function createServer() {
             "INVALID_SUPPORT_INTERVENTION_PAYLOAD",
             "INVALID_SUPPORT_SLA_PAYLOAD",
             "INVALID_RISK_POLICY_EVALUATE_PAYLOAD",
+            "INVALID_MANUAL_REVIEW_QUEUE_PAYLOAD",
+            "INVALID_MANUAL_REVIEW_RESOLVE_PAYLOAD",
             "INVALID_PAYMENT_AUTHORIZE_PAYLOAD",
             "INVALID_PAYMENT_CAPTURE_PAYLOAD",
             "INVALID_CASH_EXPECTED_PAYLOAD",

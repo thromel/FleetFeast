@@ -21,3 +21,44 @@ export interface RiskPolicyDecision {
   reasonCode: string;
   evaluatedAt: string;
 }
+
+export type ManualReviewEntityType = "REFUND" | "PAYOUT";
+export type ManualReviewStatus = "QUEUED" | "APPROVED" | "REJECTED";
+export type ManualReviewResolutionDecision = "APPROVE" | "REJECT";
+
+export interface QueueManualReviewInput {
+  entityType: ManualReviewEntityType;
+  entityId: string;
+  orderId?: string;
+  amountCents: number;
+  reasonCode: string;
+  requestedBy: string;
+}
+
+export interface ResolveManualReviewInput {
+  reviewId: string;
+  decision: ManualReviewResolutionDecision;
+  resolvedBy: string;
+  note?: string;
+}
+
+export interface ManualReviewResolution {
+  decision: ManualReviewResolutionDecision;
+  resolvedBy: string;
+  resolvedAt: string;
+  note?: string;
+}
+
+export interface ManualReviewRecord {
+  reviewId: string;
+  entityType: ManualReviewEntityType;
+  entityId: string;
+  orderId?: string;
+  amountCents: number;
+  reasonCode: string;
+  requestedBy: string;
+  status: ManualReviewStatus;
+  createdAt: string;
+  updatedAt: string;
+  resolution?: ManualReviewResolution;
+}
