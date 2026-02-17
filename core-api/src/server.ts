@@ -62,6 +62,11 @@ import {
 import { InMemoryOrderRepository } from "./modules/order-orchestration/in-memory-order-repository.js";
 import { InMemoryOrderTimelineRepository } from "./modules/order-orchestration/in-memory-order-timeline-repository.js";
 import { OrderTimelineService } from "./modules/order-orchestration/order-timeline-service.js";
+import { InMemoryCourierJobRepository } from "./modules/dispatch/in-memory-courier-job-repository.js";
+import {
+  CourierJobNotFoundError,
+  CourierJobService,
+} from "./modules/dispatch/courier-job-service.js";
 import { InMemoryPaymentIntentRepository } from "./modules/payments/in-memory-payment-intent-repository.js";
 import { InMemoryPaymentAuditRepository } from "./modules/payments/in-memory-payment-audit-repository.js";
 import { InMemoryRefundRequestRepository } from "./modules/payments/in-memory-refund-request-repository.js";
@@ -618,6 +623,19 @@ function validateOrderCancellationPayload(payload: Record<string, unknown>): {
 
   return {
     reasonCode,
+  };
+}
+
+function validateCourierJobCourierPayload(payload: Record<string, unknown>): {
+  courierId: string;
+} {
+  const courierId = payload.courierId;
+  if (typeof courierId !== "string" || courierId.trim().length === 0) {
+    throw new Error("INVALID_COURIER_JOB_COURIER_PAYLOAD");
+  }
+
+  return {
+    courierId,
   };
 }
 
@@ -1420,6 +1438,10 @@ export function createServer() {
     eventBus,
     orderTimelineService,
   );
+  const courierJobService = new CourierJobService(
+    orderRepository,
+    new InMemoryCourierJobRepository(),
+  );
   const paymentIntentRepository = new InMemoryPaymentIntentRepository();
   const refundRequestRepository = new InMemoryRefundRequestRepository();
   const paymentAuditRepository = new InMemoryPaymentAuditRepository();
@@ -1544,6 +1566,15 @@ export function createServer() {
       const consumerBasketRouteMatch = pathname.match(/^\/api\/v1\/consumer\/baskets\/([^/]+)$/);
       const courierCashCollectionRouteMatch = pathname.match(
         /^\/api\/v1\/courier\/orders\/([^/]+)\/cash-collection$/,
+      );
+      const courierJobAcceptRouteMatch = pathname.match(
+        /^\/api\/v1\/courier\/jobs\/([^/]+)\/accept$/,
+      );
+      const courierJobPickupRouteMatch = pathname.match(
+        /^\/api\/v1\/courier\/jobs\/([^/]+)\/pickup$/,
+      );
+      const courierJobDropoffRouteMatch = pathname.match(
+        /^\/api\/v1\/courier\/jobs\/([^/]+)\/dropoff$/,
       );
       const consumerOrderTimelineRouteMatch = pathname.match(
         /^\/api\/v1\/consumer\/orders\/([^/]+)\/timeline$/,
@@ -1741,6 +1772,39 @@ export function createServer() {
           courierId: input.courierId,
         });
         sendJson(response, 200, result);
+        return;
+      }
+
+      if (request.method === "GET" && pathname === "/api/v1/courier/jobs/available") {
+        const jobs = await courierJobService.listAvailableJobs();
+        sendJson(response, 200, { jobs });
+        return;
+      }
+
+      if (request.method === "POST" && courierJobAcceptRouteMatch) {
+        const payload = await parseJsonBody(request);
+        const input = validateCourierJobCourierPayload(payload);
+        const jobId = decodeURIComponent(courierJobAcceptRouteMatch[1] ?? "");
+        const job = await courierJobService.acceptJob(jobId, input.courierId);
+        sendJson(response, 200, job);
+        return;
+      }
+
+      if (request.method === "POST" && courierJobPickupRouteMatch) {
+        const payload = await parseJsonBody(request);
+        const input = validateCourierJobCourierPayload(payload);
+        const jobId = decodeURIComponent(courierJobPickupRouteMatch[1] ?? "");
+        const job = await courierJobService.pickupJob(jobId, input.courierId);
+        sendJson(response, 200, job);
+        return;
+      }
+
+      if (request.method === "POST" && courierJobDropoffRouteMatch) {
+        const payload = await parseJsonBody(request);
+        const input = validateCourierJobCourierPayload(payload);
+        const jobId = decodeURIComponent(courierJobDropoffRouteMatch[1] ?? "");
+        const job = await courierJobService.dropoffJob(jobId, input.courierId);
+        sendJson(response, 200, job);
         return;
       }
 
@@ -2217,6 +2281,14 @@ export function createServer() {
         return;
       }
 
+      if (error instanceof CourierJobNotFoundError) {
+        sendJson(response, 404, {
+          errorCode: error.code,
+          message: error.message,
+        });
+        return;
+      }
+
       if (error instanceof SupportTicketNotFoundError) {
         sendJson(response, 404, {
           errorCode: error.code,
@@ -2346,6 +2418,7 @@ export function createServer() {
             "INVALID_ORDER_CREATE_PAYLOAD",
             "INVALID_ORDER_CANCELLATION_PAYLOAD",
             "INVALID_MERCHANT_ORDER_REJECT_PAYLOAD",
+            "INVALID_COURIER_JOB_COURIER_PAYLOAD",
             "INVALID_SUPPORT_TICKET_PAYLOAD",
             "INVALID_SUPPORT_INTERVENTION_PAYLOAD",
             "INVALID_SUPPORT_SLA_PAYLOAD",
