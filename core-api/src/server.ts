@@ -117,6 +117,7 @@ import type {
 } from "./modules/merchant-catalog/types.js";
 import type { UpdateStoreStatusInput } from "./modules/merchant-catalog/store-status-types.js";
 import type { OrderStatus } from "./modules/order-orchestration/types.js";
+import type { CourierJobStatus } from "./modules/dispatch/types.js";
 import type { PaymentMethod } from "./modules/payments/types.js";
 import type {
   GeneratePayoutBatchInput,
@@ -665,6 +666,34 @@ function validateCourierJobCourierPayload(payload: Record<string, unknown>): {
 
   return {
     courierId,
+  };
+}
+
+const validCourierJobStatuses: CourierJobStatus[] = [
+  "AVAILABLE",
+  "ACCEPTED",
+  "PICKED_UP",
+  "DROPPED_OFF",
+];
+
+function validateCourierJobListQuery(searchParams: URLSearchParams): {
+  courierId: string;
+  status?: CourierJobStatus;
+} {
+  const courierId = searchParams.get("courierId");
+  const status = searchParams.get("status");
+
+  if (!courierId || courierId.trim().length === 0) {
+    throw new Error("INVALID_COURIER_JOB_QUERY");
+  }
+
+  if (status !== null && !validCourierJobStatuses.includes(status as CourierJobStatus)) {
+    throw new Error("INVALID_COURIER_JOB_QUERY");
+  }
+
+  return {
+    courierId: courierId.trim(),
+    status: status === null ? undefined : (status as CourierJobStatus),
   };
 }
 
@@ -1942,6 +1971,13 @@ export function createServer() {
         return;
       }
 
+      if (request.method === "GET" && pathname === "/api/v1/courier/jobs") {
+        const query = validateCourierJobListQuery(requestUrl.searchParams);
+        const jobs = await courierJobService.listJobs(query);
+        sendJson(response, 200, { jobs });
+        return;
+      }
+
       if (request.method === "GET" && courierJobDetailRouteMatch) {
         const jobId = decodeURIComponent(courierJobDetailRouteMatch[1] ?? "");
         const job = await courierJobService.getJob(jobId);
@@ -2619,6 +2655,7 @@ export function createServer() {
             "INVALID_ORDER_STATUS_QUERY",
             "INVALID_MERCHANT_ORDER_REJECT_PAYLOAD",
             "INVALID_MERCHANT_ORDER_QUERY",
+            "INVALID_COURIER_JOB_QUERY",
             "INVALID_COURIER_JOB_COURIER_PAYLOAD",
             "INVALID_COURIER_TELEMETRY_PAYLOAD",
             "INVALID_SUPPORT_TICKET_PAYLOAD",

@@ -306,3 +306,91 @@ test("courier job details route returns current job state", async () => {
     listener.close();
   }
 });
+
+test("courier jobs route lists jobs for courier and supports status filter", async () => {
+  const app = createServer();
+  const listener = app.listen(0);
+
+  try {
+    const address = listener.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind test listener");
+    }
+
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const acceptedOrder = await createDispatchPendingOrder(baseUrl);
+    const pickedUpOrder = await createDispatchPendingOrder(baseUrl);
+    await fetch(`${baseUrl}/api/v1/courier/jobs/${acceptedOrder.id}/accept`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courierId: "courier-1" }),
+    });
+    await fetch(`${baseUrl}/api/v1/courier/jobs/${pickedUpOrder.id}/accept`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courierId: "courier-1" }),
+    });
+    await fetch(`${baseUrl}/api/v1/courier/jobs/${pickedUpOrder.id}/pickup`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courierId: "courier-1" }),
+    });
+
+    const otherCourierOrder = await createDispatchPendingOrder(baseUrl);
+    await fetch(`${baseUrl}/api/v1/courier/jobs/${otherCourierOrder.id}/accept`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courierId: "courier-2" }),
+    });
+
+    const listResponse = await fetch(`${baseUrl}/api/v1/courier/jobs?courierId=courier-1`);
+    assert.equal(listResponse.status, 200);
+    const listPayload = (await listResponse.json()) as {
+      jobs: Array<{ jobId: string; status: string; courierId: string | null }>;
+    };
+
+    const accepted = listPayload.jobs.find((job) => job.jobId === acceptedOrder.id);
+    const pickedUp = listPayload.jobs.find((job) => job.jobId === pickedUpOrder.id);
+    const otherCourier = listPayload.jobs.find((job) => job.jobId === otherCourierOrder.id);
+
+    assert.ok(accepted);
+    assert.equal(accepted?.status, "ACCEPTED");
+    assert.ok(pickedUp);
+    assert.equal(pickedUp?.status, "PICKED_UP");
+    assert.equal(otherCourier, undefined);
+
+    const pickedUpOnlyResponse = await fetch(
+      `${baseUrl}/api/v1/courier/jobs?courierId=courier-1&status=PICKED_UP`,
+    );
+    assert.equal(pickedUpOnlyResponse.status, 200);
+    const pickedUpOnlyPayload = (await pickedUpOnlyResponse.json()) as {
+      jobs: Array<{ jobId: string; status: string }>;
+    };
+
+    assert.equal(pickedUpOnlyPayload.jobs.length, 1);
+    assert.equal(pickedUpOnlyPayload.jobs[0]?.jobId, pickedUpOrder.id);
+    assert.equal(pickedUpOnlyPayload.jobs[0]?.status, "PICKED_UP");
+  } finally {
+    listener.close();
+  }
+});
+
+test("courier jobs route rejects missing courierId query", async () => {
+  const app = createServer();
+  const listener = app.listen(0);
+
+  try {
+    const address = listener.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind test listener");
+    }
+
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const response = await fetch(`${baseUrl}/api/v1/courier/jobs`);
+    assert.equal(response.status, 400);
+    const payload = (await response.json()) as { errorCode: string };
+    assert.equal(payload.errorCode, "INVALID_REQUEST");
+  } finally {
+    listener.close();
+  }
+});

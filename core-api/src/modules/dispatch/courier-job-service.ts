@@ -1,6 +1,6 @@
 import { InMemoryOrderRepository } from "../order-orchestration/in-memory-order-repository.js";
 import { InMemoryCourierJobRepository } from "./in-memory-courier-job-repository.js";
-import type { CourierJob } from "./types.js";
+import type { CourierJob, CourierJobStatus } from "./types.js";
 
 export class CourierJobNotFoundError extends Error {
   code = "COURIER_JOB_NOT_FOUND";
@@ -30,6 +30,25 @@ export class CourierJobService {
     await this.syncDispatchPendingOrders();
     const jobs = await this.jobRepository.list();
     return jobs.filter((job) => job.status === "AVAILABLE");
+  }
+
+  async listJobs(input: {
+    courierId: string;
+    status?: CourierJobStatus;
+  }): Promise<CourierJob[]> {
+    await this.syncDispatchPendingOrders();
+    const jobs = await this.jobRepository.list();
+    return jobs.filter((job) => {
+      if (job.courierId !== input.courierId) {
+        return false;
+      }
+
+      if (input.status && job.status !== input.status) {
+        return false;
+      }
+
+      return true;
+    });
   }
 
   async getJob(jobId: string): Promise<CourierJob> {
