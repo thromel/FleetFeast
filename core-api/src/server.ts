@@ -1339,6 +1339,27 @@ function validateGenerateComplianceEvidencePayload(
   };
 }
 
+function validateBreakGlassActivationPayload(payload: Record<string, unknown>): {
+  reasonCode: string;
+  justification?: string;
+} {
+  const reasonCode = payload.reasonCode;
+  const justification = payload.justification;
+
+  if (
+    typeof reasonCode !== "string" ||
+    reasonCode.trim().length === 0 ||
+    (justification !== undefined && typeof justification !== "string")
+  ) {
+    throw new Error("INVALID_BREAK_GLASS_PAYLOAD");
+  }
+
+  return {
+    reasonCode: reasonCode.trim(),
+    justification: typeof justification === "string" ? justification : undefined,
+  };
+}
+
 function extractBearerToken(request: IncomingMessage): string {
   const authorization = request.headers.authorization;
   if (!authorization || !authorization.startsWith("Bearer ")) {
@@ -2045,6 +2066,41 @@ export function createServer() {
         return;
       }
 
+      if (request.method === "POST" && pathname === "/api/v1/admin/break-glass/activate") {
+        const token = extractBearerToken(request);
+        const claims = authService.verifyAccessToken(token);
+        if (!isAllowed(claims.role, "admin:break_glass")) {
+          sendJson(response, 403, {
+            errorCode: "IDENTITY_PERMISSION_DENIED",
+            message: "Permission denied.",
+          });
+          return;
+        }
+
+        const payload = await parseJsonBody(request);
+        const input = validateBreakGlassActivationPayload(payload);
+
+        const event = await complianceAuditService.appendEvent({
+          actionType: "ADMIN_BREAK_GLASS",
+          actorId: claims.sub,
+          targetType: "PRIVILEGED_ACCESS",
+          targetId: claims.sub,
+          reasonCode: input.reasonCode,
+          metadata: {
+            role: claims.role,
+            email: claims.email,
+            justification: input.justification ?? null,
+          },
+        });
+
+        sendJson(response, 201, {
+          activationId: event.auditEventId,
+          reasonCode: input.reasonCode,
+          status: "ACTIVE",
+        });
+        return;
+      }
+
       sendJson(response, 404, { errorCode: "NOT_FOUND", message: "Route not found" });
     } catch (error) {
       if (error instanceof DuplicateIdentityError) {
@@ -2255,6 +2311,7 @@ export function createServer() {
             "INVALID_MANUAL_REVIEW_RESOLVE_PAYLOAD",
             "INVALID_COMPLIANCE_AUDIT_PAYLOAD",
             "INVALID_COMPLIANCE_EVIDENCE_PAYLOAD",
+            "INVALID_BREAK_GLASS_PAYLOAD",
             "INVALID_PAYMENT_AUTHORIZE_PAYLOAD",
             "INVALID_PAYMENT_CAPTURE_PAYLOAD",
             "INVALID_CASH_EXPECTED_PAYLOAD",

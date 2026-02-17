@@ -14,3 +14,11 @@ test("system_admin role can access admin scope", () => {
 test("support_agent can execute support interventions", () => {
   assert.equal(isAllowed("support_agent", "support:intervene"), true);
 });
+
+test("system_admin can activate break-glass controls", () => {
+  assert.equal(isAllowed("system_admin", "admin:break_glass"), true);
+});
+
+test("finance_ops cannot activate break-glass controls", () => {
+  assert.equal(isAllowed("finance_ops", "admin:break_glass"), false);
+});

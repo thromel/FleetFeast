@@ -2,6 +2,7 @@ import type { UserRole } from "./types.js";
 
 export type Permission =
   | "admin:read"
+  | "admin:break_glass"
   | "support:intervene"
   | "orders:read"
   | "orders:write";
