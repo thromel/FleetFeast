@@ -1,0 +1,18 @@
+{
+  "storyId": "E12-S07",
+  "stage": "StageBLaunch",
+  "modeledOrdersMonthly": 18000,
+  "modeledTotalMonthlyCostUsd": 5888,
+  "costBreakdownUsd": {
+    "fargateCompute": 780,
+    "albNatEgress": 640,
+    "postgres": 1240,
+    "redis": 420,
+    "s3CloudFront": 360,
+    "eventbridgeSqs": 110,
+    "security": 310,
+    "observability": 1020,
+    "backupDr": 240,
+    "contingency": 768
+  }
+}

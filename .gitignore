@@ -17,5 +17,7 @@ dispatch-engine/bin/
 # Generated test artifacts
 tests/performance/results/*.json
 tests/resilience/results/*.json
+tests/cost/results/*.json
 !tests/performance/results/.gitkeep
 !tests/resilience/results/.gitkeep
+!tests/cost/results/.gitkeep

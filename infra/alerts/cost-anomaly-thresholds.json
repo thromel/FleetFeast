@@ -1,0 +1,20 @@
+{
+  "varianceThresholdPercent": 15,
+  "unitEconomicsDriftPercent": 20,
+  "spendAnomalyRules": [
+    {
+      "name": "daily_spend_spike",
+      "lookbackDays": 7,
+      "thresholdMultiplier": 1.35
+    },
+    {
+      "name": "service_cost_outlier",
+      "lookbackDays": 14,
+      "thresholdMultiplier": 1.25
+    }
+  ],
+  "notificationChannels": [
+    "finops-oncall",
+    "platform-oncall"
+  ]
+}

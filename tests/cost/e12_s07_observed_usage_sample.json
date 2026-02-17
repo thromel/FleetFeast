@@ -1,0 +1,17 @@
+{
+  "period": "2026-02",
+  "ordersProcessed": 18420,
+  "observedTotalMonthlyCostUsd": 6125,
+  "observedCostBreakdownUsd": {
+    "fargateCompute": 826,
+    "albNatEgress": 658,
+    "postgres": 1269,
+    "redis": 448,
+    "s3CloudFront": 381,
+    "eventbridgeSqs": 118,
+    "security": 319,
+    "observability": 1062,
+    "backupDr": 252,
+    "contingency": 792
+  }
+}
