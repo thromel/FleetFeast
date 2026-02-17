@@ -4,6 +4,8 @@ export interface Order {
   id: string;
   checkoutId: string;
   quoteHash: string;
+  consumerId: string | null;
+  merchantId: string | null;
   status: OrderStatus;
   cancellationReason: string | null;
   cancelledBy: string | null;

@@ -114,6 +114,7 @@ import type {
   UpdateMenuInput,
 } from "./modules/merchant-catalog/types.js";
 import type { UpdateStoreStatusInput } from "./modules/merchant-catalog/store-status-types.js";
+import type { OrderStatus } from "./modules/order-orchestration/types.js";
 import type { PaymentMethod } from "./modules/payments/types.js";
 import type {
   GeneratePayoutBatchInput,
@@ -682,6 +683,30 @@ function validateMerchantOrderRejectPayload(payload: Record<string, unknown>): {
 
   return {
     reasonCode,
+  };
+}
+
+function validateMerchantOrderListQuery(searchParams: URLSearchParams): {
+  merchantId: string;
+  status?: OrderStatus;
+} {
+  const merchantId = searchParams.get("merchantId");
+  const status = searchParams.get("status");
+
+  if (!merchantId || merchantId.trim().length === 0) {
+    throw new Error("INVALID_MERCHANT_ORDER_QUERY");
+  }
+
+  if (
+    status !== null &&
+    !["CREATED", "MERCHANT_ACCEPTED", "DISPATCH_PENDING", "CANCELLED"].includes(status)
+  ) {
+    throw new Error("INVALID_MERCHANT_ORDER_QUERY");
+  }
+
+  return {
+    merchantId: merchantId.trim(),
+    status: status === null ? undefined : (status as OrderStatus),
   };
 }
 
@@ -1470,6 +1495,7 @@ export function createServer() {
     orderRepository,
     eventBus,
     orderTimelineService,
+    basketRepository,
   );
   const courierJobService = new CourierJobService(
     orderRepository,
@@ -2071,7 +2097,8 @@ export function createServer() {
       }
 
       if (request.method === "GET" && pathname === "/api/v1/merchant/orders") {
-        const orders = await orderService.listOrders();
+        const query = validateMerchantOrderListQuery(requestUrl.searchParams);
+        const orders = await orderService.listOrders(query);
         sendJson(response, 200, { orders });
         return;
       }
@@ -2460,6 +2487,7 @@ export function createServer() {
             "INVALID_ORDER_CREATE_PAYLOAD",
             "INVALID_ORDER_CANCELLATION_PAYLOAD",
             "INVALID_MERCHANT_ORDER_REJECT_PAYLOAD",
+            "INVALID_MERCHANT_ORDER_QUERY",
             "INVALID_COURIER_JOB_COURIER_PAYLOAD",
             "INVALID_COURIER_TELEMETRY_PAYLOAD",
             "INVALID_SUPPORT_TICKET_PAYLOAD",

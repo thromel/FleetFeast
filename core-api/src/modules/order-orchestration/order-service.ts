@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { InMemoryCheckoutRepository } from "../consumer-ordering/in-memory-checkout-repository.js";
+import { InMemoryBasketRepository } from "../consumer-ordering/in-memory-basket-repository.js";
 import { InMemoryEventBus } from "../identity/in-memory-event-bus.js";
 import type { DomainEvent } from "../identity/types.js";
 import { InMemoryOrderRepository } from "./in-memory-order-repository.js";
@@ -62,6 +63,7 @@ export class OrderService {
     private readonly orderRepository: InMemoryOrderRepository,
     private readonly eventBus: InMemoryEventBus = new InMemoryEventBus(),
     private readonly timelineService?: OrderTimelineService,
+    private readonly basketRepository?: InMemoryBasketRepository,
   ) {}
 
   async createOrder(input: CreateOrderInput): Promise<Order> {
@@ -74,11 +76,17 @@ export class OrderService {
       throw new QuoteHashMismatchError();
     }
 
+    const basket = this.basketRepository
+      ? await this.basketRepository.findById(checkout.basketId)
+      : null;
+
     const now = new Date().toISOString();
     const order: Order = {
       id: randomUUID(),
       checkoutId: input.checkoutId,
       quoteHash: input.quoteHash,
+      consumerId: basket?.consumerId ?? null,
+      merchantId: basket?.merchantId ?? null,
       status: "CREATED",
       cancellationReason: null,
       cancelledBy: null,
@@ -242,8 +250,17 @@ export class OrderService {
     return updated;
   }
 
-  async listOrders(): Promise<Order[]> {
-    return this.orderRepository.list();
+  async listOrders(input?: { merchantId?: string; status?: OrderStatus }): Promise<Order[]> {
+    const orders = await this.orderRepository.list();
+    return orders.filter((order) => {
+      if (input?.merchantId && order.merchantId !== input.merchantId) {
+        return false;
+      }
+      if (input?.status && order.status !== input.status) {
+        return false;
+      }
+      return true;
+    });
   }
 
   private publishEvent(event: DomainEvent): void {
