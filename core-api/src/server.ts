@@ -86,6 +86,8 @@ import {
   SupportTicketNotFoundError,
   SupportTicketService,
 } from "./modules/support/support-ticket-service.js";
+import { InMemoryRiskPolicyRepository } from "./modules/risk-compliance/in-memory-risk-policy-repository.js";
+import { RiskPolicyService } from "./modules/risk-compliance/risk-policy-service.js";
 import {
   SettlementLedgerService,
   UnbalancedJournalError,
@@ -110,6 +112,7 @@ import type {
   ExecuteSupportInterventionInput,
   SupportInterventionActionType,
 } from "./modules/support/types.js";
+import type { EvaluateRiskPolicyInput } from "./modules/risk-compliance/types.js";
 import type {
   HandleNotificationFailureInput,
   NotificationActorType,
@@ -1169,6 +1172,32 @@ function validateSupportSlaEvaluationPayload(
   };
 }
 
+function validateRiskPolicyEvaluatePayload(
+  payload: Record<string, unknown>,
+): EvaluateRiskPolicyInput {
+  const actionType = payload.actionType;
+  const amountCents = payload.amountCents;
+  const actorId = payload.actorId;
+
+  if (
+    typeof actionType !== "string" ||
+    actionType.trim().length === 0 ||
+    typeof amountCents !== "number" ||
+    amountCents < 0 ||
+    !Number.isFinite(amountCents) ||
+    typeof actorId !== "string" ||
+    actorId.trim().length === 0
+  ) {
+    throw new Error("INVALID_RISK_POLICY_EVALUATE_PAYLOAD");
+  }
+
+  return {
+    actionType,
+    amountCents,
+    actorId,
+  };
+}
+
 function extractBearerToken(request: IncomingMessage): string {
   const authorization = request.headers.authorization;
   if (!authorization || !authorization.startsWith("Bearer ")) {
@@ -1254,6 +1283,7 @@ export function createServer() {
     supportEscalationRepository,
     eventBus,
   );
+  const riskPolicyService = new RiskPolicyService(new InMemoryRiskPolicyRepository(), eventBus);
   const settlementLedgerService = new SettlementLedgerService(
     new InMemorySettlementLedgerRepository(),
     eventBus,
@@ -1511,6 +1541,14 @@ export function createServer() {
           escalatedCount: result.escalations.length,
           escalations: result.escalations,
         });
+        return;
+      }
+
+      if (request.method === "POST" && pathname === "/internal/risk/policy/evaluate") {
+        const payload = await parseJsonBody(request);
+        const input = validateRiskPolicyEvaluatePayload(payload);
+        const decision = await riskPolicyService.evaluate(input);
+        sendJson(response, 200, decision);
         return;
       }
 
@@ -1975,6 +2013,7 @@ export function createServer() {
             "INVALID_SUPPORT_TICKET_PAYLOAD",
             "INVALID_SUPPORT_INTERVENTION_PAYLOAD",
             "INVALID_SUPPORT_SLA_PAYLOAD",
+            "INVALID_RISK_POLICY_EVALUATE_PAYLOAD",
             "INVALID_PAYMENT_AUTHORIZE_PAYLOAD",
             "INVALID_PAYMENT_CAPTURE_PAYLOAD",
             "INVALID_CASH_EXPECTED_PAYLOAD",
