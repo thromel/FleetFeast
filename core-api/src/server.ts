@@ -67,6 +67,7 @@ import {
   CourierJobNotFoundError,
   CourierJobService,
 } from "./modules/dispatch/courier-job-service.js";
+import { CourierTelemetryService } from "./modules/dispatch/courier-telemetry-service.js";
 import { InMemoryPaymentIntentRepository } from "./modules/payments/in-memory-payment-intent-repository.js";
 import { InMemoryPaymentAuditRepository } from "./modules/payments/in-memory-payment-audit-repository.js";
 import { InMemoryRefundRequestRepository } from "./modules/payments/in-memory-refund-request-repository.js";
@@ -636,6 +637,38 @@ function validateCourierJobCourierPayload(payload: Record<string, unknown>): {
 
   return {
     courierId,
+  };
+}
+
+function validateCourierTelemetryPayload(payload: Record<string, unknown>): {
+  courierId: string;
+  observedAtEpochMs: number;
+  speedMps: number;
+  distanceToDropoffMeters: number;
+} {
+  const courierId = payload.courierId;
+  const observedAtEpochMs = payload.observedAtEpochMs;
+  const speedMps = payload.speedMps;
+  const distanceToDropoffMeters = payload.distanceToDropoffMeters;
+
+  if (
+    typeof courierId !== "string" ||
+    courierId.trim().length === 0 ||
+    typeof observedAtEpochMs !== "number" ||
+    Number.isNaN(observedAtEpochMs) ||
+    typeof speedMps !== "number" ||
+    Number.isNaN(speedMps) ||
+    typeof distanceToDropoffMeters !== "number" ||
+    Number.isNaN(distanceToDropoffMeters)
+  ) {
+    throw new Error("INVALID_COURIER_TELEMETRY_PAYLOAD");
+  }
+
+  return {
+    courierId,
+    observedAtEpochMs,
+    speedMps,
+    distanceToDropoffMeters,
   };
 }
 
@@ -1442,6 +1475,7 @@ export function createServer() {
     orderRepository,
     new InMemoryCourierJobRepository(),
   );
+  const courierTelemetryService = new CourierTelemetryService();
   const paymentIntentRepository = new InMemoryPaymentIntentRepository();
   const refundRequestRepository = new InMemoryRefundRequestRepository();
   const paymentAuditRepository = new InMemoryPaymentAuditRepository();
@@ -1778,6 +1812,14 @@ export function createServer() {
       if (request.method === "GET" && pathname === "/api/v1/courier/jobs/available") {
         const jobs = await courierJobService.listAvailableJobs();
         sendJson(response, 200, { jobs });
+        return;
+      }
+
+      if (request.method === "POST" && pathname === "/api/v1/courier/telemetry") {
+        const payload = await parseJsonBody(request);
+        const input = validateCourierTelemetryPayload(payload);
+        const decision = courierTelemetryService.ingest(input);
+        sendJson(response, 200, decision);
         return;
       }
 
@@ -2419,6 +2461,7 @@ export function createServer() {
             "INVALID_ORDER_CANCELLATION_PAYLOAD",
             "INVALID_MERCHANT_ORDER_REJECT_PAYLOAD",
             "INVALID_COURIER_JOB_COURIER_PAYLOAD",
+            "INVALID_COURIER_TELEMETRY_PAYLOAD",
             "INVALID_SUPPORT_TICKET_PAYLOAD",
             "INVALID_SUPPORT_INTERVENTION_PAYLOAD",
             "INVALID_SUPPORT_SLA_PAYLOAD",
