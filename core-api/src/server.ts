@@ -39,6 +39,7 @@ import { InMemoryStoreStatusRepository } from "./modules/merchant-catalog/in-mem
 import { ItemAvailabilityService } from "./modules/merchant-catalog/item-availability-service.js";
 import { MenuNotFoundError, MenuService } from "./modules/merchant-catalog/menu-service.js";
 import { PrepTimeService } from "./modules/merchant-catalog/prep-time-service.js";
+import { StoreDiscoveryService } from "./modules/merchant-catalog/store-discovery-service.js";
 import { StoreStatusService } from "./modules/merchant-catalog/store-status-service.js";
 import { InMemoryQuoteRepository } from "./modules/pricing-promotions/in-memory-quote-repository.js";
 import { QuoteBasketNotFoundError, QuoteService } from "./modules/pricing-promotions/quote-service.js";
@@ -377,6 +378,31 @@ function validateStoreStatusPayload(payload: Record<string, unknown>): UpdateSto
       close: normalizedSchedule.close,
       timezone: normalizedSchedule.timezone,
     },
+  };
+}
+
+function validateStoreDiscoveryQuery(searchParams: URLSearchParams): {
+  orderable?: boolean;
+  at?: Date;
+} {
+  const orderableRaw = searchParams.get("orderable");
+  const atRaw = searchParams.get("at");
+
+  if (orderableRaw !== null && orderableRaw !== "true" && orderableRaw !== "false") {
+    throw new Error("INVALID_STORE_DISCOVERY_QUERY");
+  }
+
+  let at: Date | undefined;
+  if (atRaw !== null) {
+    at = new Date(atRaw);
+    if (Number.isNaN(at.getTime())) {
+      throw new Error("INVALID_STORE_DISCOVERY_QUERY");
+    }
+  }
+
+  return {
+    orderable: orderableRaw === null ? undefined : orderableRaw === "true",
+    at,
   };
 }
 
@@ -1511,6 +1537,7 @@ export function createServer() {
   const prepTimeService = new PrepTimeService(menuRepository);
   const storeStatusRepository = new InMemoryStoreStatusRepository();
   const storeStatusService = new StoreStatusService(storeStatusRepository);
+  const storeDiscoveryService = new StoreDiscoveryService(menuRepository, storeStatusService);
   const itemAvailabilityRepository = new InMemoryItemAvailabilityRepository();
   const itemAvailabilityService = new ItemAvailabilityService(itemAvailabilityRepository);
   const basketRepository = new InMemoryBasketRepository();
@@ -1780,6 +1807,13 @@ export function createServer() {
         const input = validateGenerateQuotePayload(payload);
         const quote = await quoteService.generateQuote(input);
         sendJson(response, 200, quote);
+        return;
+      }
+
+      if (request.method === "GET" && pathname === "/api/v1/consumer/stores") {
+        const query = validateStoreDiscoveryQuery(requestUrl.searchParams);
+        const stores = await storeDiscoveryService.listStores(query);
+        sendJson(response, 200, { stores });
         return;
       }
 
@@ -2522,6 +2556,7 @@ export function createServer() {
             "INVALID_MENU_CREATE_PAYLOAD",
             "INVALID_MENU_UPDATE_PAYLOAD",
             "INVALID_STORE_STATUS_PAYLOAD",
+            "INVALID_STORE_DISCOVERY_QUERY",
             "INVALID_ORDERABILITY_QUERY",
             "INVALID_ITEM_AVAILABILITY_PAYLOAD",
             "INVALID_BASKET_CREATE_PAYLOAD",
