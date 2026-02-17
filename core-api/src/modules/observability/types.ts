@@ -30,3 +30,16 @@ export interface FinishTraceInput {
   statusCode: number;
   metadata?: Record<string, unknown>;
 }
+
+export interface SLOBreach {
+  type: "AVAILABILITY" | "LATENCY_CHECKOUT" | "LATENCY_TIMELINE";
+  actual: number;
+  threshold: number;
+}
+
+export interface SLOReport {
+  availabilityPercent: number;
+  checkoutP95Ms: number;
+  timelineP95Ms: number;
+  breaches: SLOBreach[];
+}

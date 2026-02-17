@@ -32,6 +32,7 @@ import { isAllowed } from "./modules/identity/rbac.js";
 import type { RegisterIdentityInput, UserRole } from "./modules/identity/types.js";
 import { InMemoryStructuredLogRepository } from "./modules/observability/in-memory-structured-log-repository.js";
 import { ObservabilityService } from "./modules/observability/observability-service.js";
+import { SLOService } from "./modules/observability/slo-service.js";
 import { InMemoryMenuRepository } from "./modules/merchant-catalog/in-memory-menu-repository.js";
 import { InMemoryItemAvailabilityRepository } from "./modules/merchant-catalog/in-memory-item-availability-repository.js";
 import { InMemoryStoreStatusRepository } from "./modules/merchant-catalog/in-memory-store-status-repository.js";
@@ -1354,6 +1355,7 @@ export function createServer() {
     new InMemoryStructuredLogRepository(),
     eventBus,
   );
+  const sloService = new SLOService(eventBus);
   const identityService = new IdentityService(repository, eventBus);
   const sessionStore = new InMemorySessionStore();
   const authService = new AuthService(
@@ -1539,6 +1541,13 @@ export function createServer() {
         const traceId = requestUrl.searchParams.get("traceId") ?? undefined;
         const logs = observabilityService.listLogs(traceId);
         sendJson(response, 200, { logs });
+        return;
+      }
+
+      if (request.method === "GET" && pathname === "/internal/observability/slo/dashboard") {
+        const logs = observabilityService.listLogs();
+        const report = await sloService.evaluate(logs);
+        sendJson(response, 200, report);
         return;
       }
 
