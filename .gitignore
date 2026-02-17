@@ -13,3 +13,9 @@ dispatch-engine/bin/
 
 # OS
 .DS_Store
+
+# Generated test artifacts
+tests/performance/results/*.json
+tests/resilience/results/*.json
+!tests/performance/results/.gitkeep
+!tests/resilience/results/.gitkeep

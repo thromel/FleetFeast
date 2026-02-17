@@ -1,0 +1,63 @@
+{
+  "storyId": "E12-S05",
+  "suiteVersion": "1.0.0",
+  "globalCriteria": {
+    "maxDataLossSeconds": 900,
+    "maxRecoverySeconds": 3600,
+    "evidenceRequired": true
+  },
+  "scenarios": [
+    {
+      "id": "queue_lag",
+      "description": "Pause queue consumers and introduce backlog to validate lag handling and catch-up.",
+      "inject": {
+        "type": "queue_pause_and_backlog",
+        "durationSeconds": 300
+      },
+      "successCriteria": [
+        "queue backlog drains below threshold within 900 seconds",
+        "latency budget breach alert is emitted",
+        "no message loss is observed"
+      ],
+      "maxRecoverySeconds": 900,
+      "expectedAlerts": [
+        "platform.latency_budget_breached.v1",
+        "platform.slo_breach_detected.v1"
+      ]
+    },
+    {
+      "id": "db_failover",
+      "description": "Trigger managed database failover and validate application recovery path.",
+      "inject": {
+        "type": "managed_db_failover",
+        "durationSeconds": 420
+      },
+      "successCriteria": [
+        "write path recovers with no durable data loss",
+        "read path degrades gracefully during failover",
+        "service returns to healthy state within RTO"
+      ],
+      "maxRecoverySeconds": 1800,
+      "expectedAlerts": [
+        "platform.slo_breach_detected.v1"
+      ]
+    },
+    {
+      "id": "provider_outage",
+      "description": "Disable external provider integration (maps/notification/payment mock) and validate fallback behavior.",
+      "inject": {
+        "type": "external_provider_blackhole",
+        "durationSeconds": 600
+      },
+      "successCriteria": [
+        "requests are queued or degraded without hard failure",
+        "DLQ captures non-retriable payloads",
+        "support-visible incident signal is produced"
+      ],
+      "maxRecoverySeconds": 1500,
+      "expectedAlerts": [
+        "support.ticket_escalated.v1"
+      ]
+    }
+  ]
+}
