@@ -8,5 +8,6 @@ done
 
 bash tests/contracts/e06_s01_dispatch_contract_test.sh
 bash tests/contracts/e12_s01_rest_contract_test.sh
+bash tests/contracts/e12_s02_grpc_contract_test.sh
 
 echo "Contract checks passed"

@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package dispatch.v1;
+
+option go_package = "github.com/romel/foodpanda/dispatch-engine/internal/gen/dispatch/v1;dispatchv1";
+
+message ScoreRequest {
+  string order_id = 1;
+  repeated Candidate candidates = 2;
+  double sla_pressure = 3;
+}
+
+message ScoreResponse {
+  repeated CandidateScore candidates = 1;
+}
+
+message AssignRequest {
+  string order_id = 1;
+  repeated Candidate candidates = 2;
+  double sla_pressure = 3;
+  bool merchant_self_delivery_enabled = 4;
+}
+
+message AssignResponse {
+  string assignment_id = 1;
+  string mode = 2;
+  string courier_id = 3;
+  string eta_seconds = 4;
+  repeated string reason_codes = 5;
+}
+
+message ReassignRequest {
+  string order_id = 1;
+  string previous_assignment_id = 2;
+  string reason_code = 3;
+  repeated Candidate candidates = 4;
+  int32 attempt = 5;
+  bool merchant_self_delivery_enabled = 6;
+  double sla_pressure = 7;
+  string previous_courier_id = 8;
+}
+
+message ReassignResponse {
+  string assignment_id = 1;
+  string courier_id = 2;
+  int32 eta_seconds = 3;
+  repeated string reason_codes = 4;
+  string mode = 5;
+  bool escalated_to_support = 6;
+}
+
+message UpdateTelemetryRequest {
+  string courier_id = 1;
+  double latitude = 2;
+  double longitude = 3;
+  int64 observed_at_epoch_ms = 4;
+  double speed_mps = 5;
+  int32 distance_to_dropoff_meters = 6;
+}
+
+message UpdateTelemetryResponse {
+  bool accepted = 1;
+  string drop_reason = 2;
+  int32 eta_seconds = 3;
+}
+
+message Candidate {
+  string courier_id = 1;
+  int32 distance_meters = 2;
+  bool available = 3;
+  int32 active_orders = 4;
+  bool within_rest_window = 5;
+}
+
+message CandidateScore {
+  string courier_id = 1;
+  double score = 2;
+  repeated string reason_codes = 3;
+}
+
+service DispatchService {
+  rpc Score(ScoreRequest) returns (ScoreResponse);
+  rpc Assign(AssignRequest) returns (AssignResponse);
+  rpc UpdateTelemetry(UpdateTelemetryRequest) returns (UpdateTelemetryResponse);
+}
