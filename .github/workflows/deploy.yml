@@ -21,15 +21,51 @@ jobs:
       - name: Verify infra and policy checks
         run: |
           bash tests/infra/e01_s02_env_foundation_test.sh
+          bash tests/infra/e01_s03_runtime_stack_test.sh
+          bash tests/infra/e01_s06_release_strategy_test.sh
           bash tests/policy/check_policy.sh
 
-  deploy:
+  core_blue_green_deploy:
     needs: pre_deploy_checks
     runs-on: ubuntu-latest
     environment: ${{ inputs.target_environment }}
     steps:
       - uses: actions/checkout@v4
-      - name: Announce deployment target
-        run: echo "Deploying to ${{ inputs.target_environment }}"
-      - name: Deployment placeholder
-        run: echo "Deployment command goes here"
+      - name: Announce core strategy
+        run: echo "Deploying core-api with blue/green strategy to ${{ inputs.target_environment }}"
+      - name: Core blue-green deployment placeholder
+        run: echo "core-api blue/green deployment command goes here"
+
+  dispatch_canary_deploy:
+    needs: pre_deploy_checks
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target_environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Announce dispatch strategy
+        run: echo "Deploying dispatch-engine with canary strategy to ${{ inputs.target_environment }}"
+      - name: Dispatch canary deployment placeholder
+        run: echo "dispatch-engine canary deployment command goes here"
+
+  release_smoke_gate:
+    needs: [pre_deploy_checks, core_blue_green_deploy, dispatch_canary_deploy]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target_environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Execute release smoke checks
+        env:
+          SMOKE_BASE_URL: ${{ vars.SMOKE_BASE_URL || 'http://127.0.0.1:3000' }}
+        run: bash infra/scripts/release_smoke_test.sh
+
+  rollback_on_failure:
+    if: ${{ failure() }}
+    needs: [core_blue_green_deploy, dispatch_canary_deploy, release_smoke_gate]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target_environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Roll back release
+        env:
+          DEPLOY_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: bash infra/scripts/rollback_release.sh
