@@ -268,3 +268,41 @@ test("courier job dropoff rejects out-of-sequence transition", async () => {
     listener.close();
   }
 });
+
+test("courier job details route returns current job state", async () => {
+  const app = createServer();
+  const listener = app.listen(0);
+
+  try {
+    const address = listener.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind test listener");
+    }
+
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const order = await createDispatchPendingOrder(baseUrl);
+
+    const acceptResponse = await fetch(`${baseUrl}/api/v1/courier/jobs/${order.id}/accept`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courierId: "courier-1" }),
+    });
+    assert.equal(acceptResponse.status, 200);
+
+    const detailResponse = await fetch(`${baseUrl}/api/v1/courier/jobs/${order.id}`);
+    assert.equal(detailResponse.status, 200);
+    const payload = (await detailResponse.json()) as {
+      jobId: string;
+      orderId: string;
+      status: string;
+      courierId: string | null;
+    };
+
+    assert.equal(payload.jobId, order.id);
+    assert.equal(payload.orderId, order.id);
+    assert.equal(payload.status, "ACCEPTED");
+    assert.equal(payload.courierId, "courier-1");
+  } finally {
+    listener.close();
+  }
+});

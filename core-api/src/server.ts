@@ -1690,6 +1690,9 @@ export function createServer() {
       const courierJobAcceptRouteMatch = pathname.match(
         /^\/api\/v1\/courier\/jobs\/([^/]+)\/accept$/,
       );
+      const courierJobDetailRouteMatch = pathname.match(
+        /^\/api\/v1\/courier\/jobs\/([^/]+)$/,
+      );
       const courierJobPickupRouteMatch = pathname.match(
         /^\/api\/v1\/courier\/jobs\/([^/]+)\/pickup$/,
       );
@@ -1908,6 +1911,13 @@ export function createServer() {
       if (request.method === "GET" && pathname === "/api/v1/courier/jobs/available") {
         const jobs = await courierJobService.listAvailableJobs();
         sendJson(response, 200, { jobs });
+        return;
+      }
+
+      if (request.method === "GET" && courierJobDetailRouteMatch) {
+        const jobId = decodeURIComponent(courierJobDetailRouteMatch[1] ?? "");
+        const job = await courierJobService.getJob(jobId);
+        sendJson(response, 200, job);
         return;
       }
 

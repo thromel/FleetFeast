@@ -32,6 +32,11 @@ export class CourierJobService {
     return jobs.filter((job) => job.status === "AVAILABLE");
   }
 
+  async getJob(jobId: string): Promise<CourierJob> {
+    await this.syncDispatchPendingOrders();
+    return this.requireJob(jobId);
+  }
+
   async acceptJob(jobId: string, courierId: string): Promise<CourierJob> {
     await this.syncDispatchPendingOrders();
     const job = await this.requireJob(jobId);
