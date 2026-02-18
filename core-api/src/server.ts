@@ -2553,6 +2553,9 @@ export function createServer(options: CreateServerOptions = {}) {
       }
 
       if (request.method === "POST" && pathname === "/internal/orders/timeline/rebuild") {
+        if (eventBus instanceof DurableEventBus) {
+          await eventBus.flush();
+        }
         const result = await orderTimelineService.rebuildFromEventLog();
         sendJson(response, 200, result);
         return;

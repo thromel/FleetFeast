@@ -122,3 +122,49 @@ test("order timeline survives core-api restart when persistence is enabled", asy
     listenerB.close();
   }
 });
+
+test("timeline rebuild rehydrates from durable outbox after restart", async () => {
+  const documentStore = new InMemoryDocumentStore();
+
+  const appA = createServer({
+    enablePersistence: true,
+    documentStore,
+  });
+  const listenerA = appA.listen(0);
+
+  try {
+    const address = listenerA.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind test listener");
+    }
+
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    await createAndAdvanceOrder(baseUrl);
+  } finally {
+    listenerA.close();
+  }
+
+  const appB = createServer({
+    enablePersistence: true,
+    documentStore,
+  });
+  const listenerB = appB.listen(0);
+
+  try {
+    const address = listenerB.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind test listener");
+    }
+
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const rebuildResponse = await fetch(`${baseUrl}/internal/orders/timeline/rebuild`, {
+      method: "POST",
+    });
+
+    assert.equal(rebuildResponse.status, 200);
+    const rebuild = (await rebuildResponse.json()) as { entriesRebuilt: number };
+    assert.ok(rebuild.entriesRebuilt >= 3);
+  } finally {
+    listenerB.close();
+  }
+});

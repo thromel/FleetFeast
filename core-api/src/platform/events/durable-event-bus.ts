@@ -6,6 +6,7 @@ import type { EventBroker } from "../broker/event-broker.js";
 import type { DocumentStore } from "../persistence/document-store.js";
 
 export class DurableEventBus extends InMemoryEventBus {
+  private readonly hydrationTask: Promise<void>;
   private readonly pendingPublishes = new Set<Promise<void>>();
 
   constructor(
@@ -14,12 +15,14 @@ export class DurableEventBus extends InMemoryEventBus {
     private readonly outboxNamespace: string = "platform.event_outbox",
   ) {
     super();
+    this.hydrationTask = this.hydrateFromOutbox();
   }
 
   override publish(event: DomainEvent): void {
-    super.publish(event);
-
-    const publishTask = this.persistAndPublish(event);
+    const publishTask = this.hydrationTask.then(async () => {
+      super.publish(event);
+      await this.persistAndPublish(event);
+    });
     this.pendingPublishes.add(publishTask);
     void publishTask.finally(() => {
       this.pendingPublishes.delete(publishTask);
@@ -27,7 +30,19 @@ export class DurableEventBus extends InMemoryEventBus {
   }
 
   async flush(): Promise<void> {
+    await this.hydrationTask;
     await Promise.all([...this.pendingPublishes]);
+  }
+
+  private async hydrateFromOutbox(): Promise<void> {
+    if (!this.documentStore) {
+      return;
+    }
+
+    const persistedEvents = await this.documentStore.list<DomainEvent>(this.outboxNamespace);
+    for (const event of persistedEvents) {
+      super.publish(event);
+    }
   }
 
   private async persistAndPublish(event: DomainEvent): Promise<void> {

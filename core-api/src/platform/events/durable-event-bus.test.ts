@@ -5,6 +5,23 @@ import { InMemoryEventBroker } from "../broker/in-memory-event-broker.js";
 import { InMemoryDocumentStore } from "../persistence/in-memory-document-store.js";
 import { DurableEventBus } from "./durable-event-bus.js";
 
+test("durable event bus hydrates existing outbox events on startup", async () => {
+  const documentStore = new InMemoryDocumentStore();
+  await documentStore.put("platform.event_outbox", "evt-1", {
+    type: "order.created.v1",
+    occurredAt: "2026-02-17T00:00:00.000Z",
+    payload: {
+      orderId: "order-preexisting-1",
+    },
+  });
+
+  const eventBus = new DurableEventBus(documentStore);
+  await eventBus.flush();
+
+  assert.equal(eventBus.events.length, 1);
+  assert.equal(eventBus.events[0]?.type, "order.created.v1");
+});
+
 test("durable event bus appends events to outbox store and publishes broker messages", async () => {
   const documentStore = new InMemoryDocumentStore();
   const broker = new InMemoryEventBroker();
