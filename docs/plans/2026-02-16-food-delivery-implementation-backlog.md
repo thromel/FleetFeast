@@ -416,7 +416,7 @@ Last updated: `2026-02-18`
 | E05 Order Orchestration | Done | State machine, cancellation matrix, dispatch request flow, timeline + rebuild implemented |
 | E06 Dispatch | Mostly done | Go dispatch scoring/assign/reassign/telemetry implemented; direct core->dispatch gRPC orchestration remains for full parity |
 | E07 Payments | Done | Auth/capture/COD/refunds/audit flows implemented |
-| E08 Settlement/Payouts | In progress | Ledger, payout batches/schedules/statements done; reconciliation run/history implemented; processor-file ingest job still pending |
+| E08 Settlement/Payouts | In progress | Ledger, payout batches/schedules/statements done; reconciliation run/history + CSV ingest endpoint implemented; scheduled processor pull/import still pending |
 | E09 Notifications | Done | Fanout, templates/locale, retry+DLQ, receipts implemented |
 | E10 Support/Risk/Compliance | Done | Tickets, interventions, SLA escalation, policy engine, manual reviews, compliance audit implemented |
 | E11 Observability/SRE | Partial | Tracing/logging, SLO APIs, and durable structured-log persistence implemented; DR/security hardening still pending |
@@ -425,6 +425,7 @@ Last updated: `2026-02-18`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
+| `8fe4b9f` | E08-S03 | Added settlement reconciliation CSV ingest endpoint with payload validation and test coverage |
 | `c8f98d0` | E08-S03 | Added reconciliation summary counters for dashboard-friendly API responses |
 | `3e1180f` | E11-S01 | Added persistent structured log repository and restart durability coverage |
 | `8f96f84` | E08-S03 | Added reconciliation history filter by exception state |
@@ -445,6 +446,6 @@ Last updated: `2026-02-18`
 
 ### 11.3 Next Backend Features Queue
 
-1. Complete `E11-S01` persistence gap by adding durable observability log repository in persistence mode.
-2. Close remaining `E06/E05` integration gap with direct core orchestration path to dispatch gRPC contracts.
-3. Complete `E08-S03` processor settlement-file ingest/reconciliation path (beyond manual payload run endpoint).
+1. Close remaining `E06/E05` integration gap with direct core orchestration path to dispatch gRPC contracts.
+2. Add scheduled processor settlement-file pull/import that feeds the reconciliation ingest path.
+3. Implement `E11-S04` backup/PITR and DR failover runbook automation.
