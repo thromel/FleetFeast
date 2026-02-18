@@ -19,6 +19,9 @@ import { PersistentItemAvailabilityRepository } from "./platform/persistence/rep
 import { PersistentStoreStatusRepository } from "./platform/persistence/repositories/persistent-store-status-repository.js";
 import { PersistentOrderRepository } from "./platform/persistence/repositories/persistent-order-repository.js";
 import { PersistentCourierJobRepository } from "./platform/persistence/repositories/persistent-courier-job-repository.js";
+import { PersistentPaymentIntentRepository } from "./platform/persistence/repositories/persistent-payment-intent-repository.js";
+import { PersistentRefundRequestRepository } from "./platform/persistence/repositories/persistent-refund-request-repository.js";
+import { PersistentPaymentAuditRepository } from "./platform/persistence/repositories/persistent-payment-audit-repository.js";
 
 import { AuthError, AuthService } from "./modules/identity/auth-service.js";
 import {
@@ -1715,9 +1718,15 @@ export function createServer(options: CreateServerOptions = {}) {
       : new InMemoryCourierJobRepository(),
   );
   const courierTelemetryService = new CourierTelemetryService();
-  const paymentIntentRepository = new InMemoryPaymentIntentRepository();
-  const refundRequestRepository = new InMemoryRefundRequestRepository();
-  const paymentAuditRepository = new InMemoryPaymentAuditRepository();
+  const paymentIntentRepository = persistenceEnabled
+    ? new PersistentPaymentIntentRepository(documentStore!)
+    : new InMemoryPaymentIntentRepository();
+  const refundRequestRepository = persistenceEnabled
+    ? new PersistentRefundRequestRepository(documentStore!)
+    : new InMemoryRefundRequestRepository();
+  const paymentAuditRepository = persistenceEnabled
+    ? new PersistentPaymentAuditRepository(documentStore!)
+    : new InMemoryPaymentAuditRepository();
   const paymentService = new PaymentService(
     orderRepository,
     paymentIntentRepository,
