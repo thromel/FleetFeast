@@ -71,8 +71,25 @@ export class SettlementReconciliationService {
     return result;
   }
 
-  async listResults(limit?: number): Promise<SettlementReconciliationResult[]> {
-    return this.repository.list(limit);
+  async listResults(input?: {
+    limit?: number;
+    hasExceptions?: boolean;
+  }): Promise<SettlementReconciliationResult[]> {
+    const history = await this.repository.list();
+    const filtered =
+      input?.hasExceptions === undefined
+        ? history
+        : history.filter((result) =>
+            input.hasExceptions
+              ? result.exceptionCases.length > 0
+              : result.exceptionCases.length === 0,
+          );
+
+    if (input?.limit === undefined) {
+      return filtered;
+    }
+
+    return filtered.slice(0, input.limit);
   }
 
   private sumAmounts(records: Map<string, number>): number {

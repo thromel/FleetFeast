@@ -1150,10 +1150,26 @@ function validateSettlementReconciliationPayload(
   };
 }
 
-function validateSettlementReconciliationQuery(searchParams: URLSearchParams): { limit?: number } {
+function validateSettlementReconciliationQuery(searchParams: URLSearchParams): {
+  limit?: number;
+  hasExceptions?: boolean;
+} {
   const rawLimit = searchParams.get("limit");
+  const rawHasExceptions = searchParams.get("hasExceptions");
+
+  let hasExceptions: boolean | undefined;
+  if (rawHasExceptions !== null) {
+    if (rawHasExceptions === "true") {
+      hasExceptions = true;
+    } else if (rawHasExceptions === "false") {
+      hasExceptions = false;
+    } else {
+      throw new Error("INVALID_SETTLEMENT_RECONCILIATION_QUERY");
+    }
+  }
+
   if (rawLimit === null) {
-    return {};
+    return { hasExceptions };
   }
 
   const parsedLimit = Number(rawLimit);
@@ -1161,7 +1177,10 @@ function validateSettlementReconciliationQuery(searchParams: URLSearchParams): {
     throw new Error("INVALID_SETTLEMENT_RECONCILIATION_QUERY");
   }
 
-  return { limit: parsedLimit };
+  return {
+    limit: parsedLimit,
+    hasExceptions,
+  };
 }
 
 function validatePayoutBatchPayload(payload: Record<string, unknown>): GeneratePayoutBatchInput {
@@ -2442,7 +2461,7 @@ export function createServer(options: CreateServerOptions = {}) {
 
       if (request.method === "GET" && pathname === "/internal/settlement/reconciliation/results") {
         const query = validateSettlementReconciliationQuery(requestUrl.searchParams);
-        const results = await settlementReconciliationService.listResults(query.limit);
+        const results = await settlementReconciliationService.listResults(query);
         sendJson(response, 200, { results });
         return;
       }
