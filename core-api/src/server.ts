@@ -25,6 +25,7 @@ import { PersistentPaymentAuditRepository } from "./platform/persistence/reposit
 import { PersistentPayoutBatchRepository } from "./platform/persistence/repositories/persistent-payout-batch-repository.js";
 import { PersistentSettlementLedgerRepository } from "./platform/persistence/repositories/persistent-settlement-ledger-repository.js";
 import { PersistentManualReviewRepository } from "./platform/persistence/repositories/persistent-manual-review-repository.js";
+import { PersistentSupportTicketRepository } from "./platform/persistence/repositories/persistent-support-ticket-repository.js";
 
 import { AuthError, AuthService } from "./modules/identity/auth-service.js";
 import {
@@ -1738,7 +1739,9 @@ export function createServer(options: CreateServerOptions = {}) {
     refundRequestRepository,
     paymentAuditRepository,
   );
-  const supportTicketRepository = new InMemorySupportTicketRepository();
+  const supportTicketRepository = persistenceEnabled
+    ? new PersistentSupportTicketRepository(documentStore!)
+    : new InMemorySupportTicketRepository();
   const supportEscalationRepository = new InMemorySupportEscalationRepository();
   const supportTicketService = new SupportTicketService(
     supportTicketRepository,
