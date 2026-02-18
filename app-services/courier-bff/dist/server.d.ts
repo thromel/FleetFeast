@@ -1,4 +1,5 @@
 import { type FastifyInstance } from "fastify";
+import { type AppSessionAuthService, type OidcVerifier } from "@fleetfeast/app-auth";
 export interface CourierJobView {
     jobId: string;
     orderId: string;
@@ -6,11 +7,13 @@ export interface CourierJobView {
 }
 export interface CourierBffDependencies {
     listAvailableJobs(): Promise<CourierJobView[]>;
+    oidcVerifier: OidcVerifier;
+    sessionAuth: AppSessionAuthService;
 }
 export interface CourierCoreApiDependencyOptions {
     coreApiBaseUrl: string;
     fetchImpl?: typeof fetch;
 }
-export declare function createCourierCoreApiDependencies(options: CourierCoreApiDependencyOptions): CourierBffDependencies;
+export declare function createCourierCoreApiDependencies(options: CourierCoreApiDependencyOptions): Pick<CourierBffDependencies, "listAvailableJobs">;
 export declare function createCourierBffServer(dependencies: CourierBffDependencies): FastifyInstance;
 export declare function createCourierBffServerFromEnv(): FastifyInstance;

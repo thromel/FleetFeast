@@ -1,18 +1,17 @@
 {
-  "name": "@fleetfeast/courier-bff",
+  "name": "@fleetfeast/app-auth",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "dist/server.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test dist/**/*.test.js",
-    "start": "npm run build && node dist/main.js"
+    "test": "npm run build && node --test dist/**/*.test.js"
   },
   "dependencies": {
-    "@fleetfeast/app-auth": "0.1.0",
     "@fleetfeast/shared-contracts": "0.1.0",
-    "fastify": "^5.2.1"
+    "jose": "^5.10.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.13"

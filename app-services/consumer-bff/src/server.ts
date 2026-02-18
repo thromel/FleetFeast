@@ -1,8 +1,13 @@
-import { randomUUID } from "node:crypto";
-
 import Fastify, { type FastifyInstance } from "fastify";
 
-import { createAppSession } from "@fleetfeast/shared-contracts";
+import {
+  createAppSessionAuthServiceFromEnv,
+  createOidcVerifierFromEnv,
+  extractRolesFromClaims,
+  mapAppAuthError,
+  type AppSessionAuthService,
+  type OidcVerifier,
+} from "@fleetfeast/app-auth";
 
 export interface ConsumerOrderView {
   id: string;
@@ -12,6 +17,8 @@ export interface ConsumerOrderView {
 
 export interface ConsumerBffDependencies {
   getOrderById(orderId: string): Promise<ConsumerOrderView>;
+  oidcVerifier: OidcVerifier;
+  sessionAuth: AppSessionAuthService;
 }
 
 export interface ConsumerCoreApiDependencyOptions {
@@ -21,7 +28,7 @@ export interface ConsumerCoreApiDependencyOptions {
 
 export function createConsumerCoreApiDependencies(
   options: ConsumerCoreApiDependencyOptions,
-): ConsumerBffDependencies {
+): Pick<ConsumerBffDependencies, "getOrderById"> {
   const baseUrl = options.coreApiBaseUrl.replace(/\/+$/, "");
   const fetchImpl = options.fetchImpl ?? fetch;
 
@@ -57,36 +64,112 @@ export function createConsumerBffServer(
   app.post("/app/v1/consumer/session/exchange", async (request, reply) => {
     const payload = request.body as {
       oidcToken?: unknown;
-      userId?: unknown;
       traceId?: unknown;
+      deviceId?: unknown;
     };
 
     if (
       typeof payload?.oidcToken !== "string" ||
       payload.oidcToken.trim().length === 0 ||
-      typeof payload?.userId !== "string" ||
-      payload.userId.trim().length === 0 ||
       typeof payload?.traceId !== "string" ||
       payload.traceId.trim().length === 0
     ) {
       reply.status(400);
       return {
         errorCode: "INVALID_APP_SESSION_EXCHANGE_PAYLOAD",
-        message: "oidcToken, userId, and traceId are required",
+        message: "oidcToken and traceId are required",
       };
     }
 
-    const session = createAppSession({
-      sessionId: randomUUID(),
-      userId: payload.userId,
-      role: "consumer",
-      persona: "consumer",
-      traceId: payload.traceId,
-      refreshTokenId: randomUUID(),
-      expiresInSeconds: 900,
-    });
+    if (payload.deviceId !== undefined && typeof payload.deviceId !== "string") {
+      reply.status(400);
+      return {
+        errorCode: "INVALID_APP_DEVICE_ID",
+        message: "deviceId must be a string when provided",
+      };
+    }
 
-    return { session };
+    try {
+      const identity = await dependencies.oidcVerifier.verifyIdToken(payload.oidcToken);
+      const roles = extractRolesFromClaims(identity.claims);
+      if (roles.length > 0 && !roles.includes("consumer")) {
+        reply.status(403);
+        return {
+          errorCode: "CONSUMER_ROLE_REQUIRED",
+          message: "OIDC identity does not include consumer role",
+        };
+      }
+
+      const sessionBundle = await dependencies.sessionAuth.issueSession({
+        userId: identity.subject,
+        role: "consumer",
+        persona: "consumer",
+        traceId: payload.traceId,
+        deviceId: payload.deviceId,
+      });
+
+      return sessionBundle;
+    } catch (error: unknown) {
+      const mapped = mapAppAuthError(error);
+      if (mapped) {
+        reply.status(mapped.statusCode);
+        return {
+          errorCode: mapped.errorCode,
+          message: mapped.message,
+        };
+      }
+
+      throw error;
+    }
+  });
+
+  app.post("/app/v1/consumer/session/refresh", async (request, reply) => {
+    const payload = request.body as {
+      refreshToken?: unknown;
+      traceId?: unknown;
+      deviceId?: unknown;
+    };
+
+    if (
+      typeof payload?.refreshToken !== "string" ||
+      payload.refreshToken.trim().length === 0 ||
+      typeof payload?.traceId !== "string" ||
+      payload.traceId.trim().length === 0
+    ) {
+      reply.status(400);
+      return {
+        errorCode: "INVALID_APP_SESSION_REFRESH_PAYLOAD",
+        message: "refreshToken and traceId are required",
+      };
+    }
+
+    if (payload.deviceId !== undefined && typeof payload.deviceId !== "string") {
+      reply.status(400);
+      return {
+        errorCode: "INVALID_APP_DEVICE_ID",
+        message: "deviceId must be a string when provided",
+      };
+    }
+
+    try {
+      const sessionBundle = await dependencies.sessionAuth.refreshSession({
+        refreshToken: payload.refreshToken,
+        traceId: payload.traceId,
+        deviceId: payload.deviceId,
+      });
+      return sessionBundle;
+    } catch (error: unknown) {
+      const mapped = mapAppAuthError(error);
+      if (mapped) {
+        reply.status(mapped.statusCode);
+        return {
+          errorCode: mapped.errorCode,
+          message: mapped.message,
+        };
+      }
+
+      throw error;
+    }
   });
 
   app.get("/app/v1/consumer/orders/:orderId", async (request, reply) => {
@@ -107,9 +190,11 @@ export function createConsumerBffServer(
 }
 
 export function createConsumerBffServerFromEnv(): FastifyInstance {
-  return createConsumerBffServer(
-    createConsumerCoreApiDependencies({
+  return createConsumerBffServer({
+    ...createConsumerCoreApiDependencies({
       coreApiBaseUrl: process.env.CORE_API_BASE_URL ?? "http://127.0.0.1:3000",
     }),
-  );
+    oidcVerifier: createOidcVerifierFromEnv(process.env),
+    sessionAuth: createAppSessionAuthServiceFromEnv(process.env),
+  });
 }

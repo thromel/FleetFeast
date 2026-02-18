@@ -463,13 +463,14 @@ Last updated: `2026-02-18`
 | A03 BFF-to-core backend connectivity | Done | Core API adapters implemented in all three BFFs with test coverage against backend HTTP stubs |
 | A04 App runtime bootstrap for BFF services | Done | `main.ts` entrypoints and `start` scripts added for local runtime |
 | A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js `web-merchant` and `web-admin` apps implemented with live ops-bff integration; mobile surfaces pending |
-| A06 OIDC+PKCE and app-session exchange hardening | In progress | Session exchange endpoints exist; provider-backed token verification and refresh hardening pending |
+| A06 OIDC+PKCE and app-session exchange hardening | Done | Added shared OIDC verifier (JWKS + dev fallback), persona-aware role checks, rotating refresh tokens, replay detection, and device-bound refresh validation across all BFFs |
 | A07 Push fallback (APNs/FCM) and full realtime fanout | Not started | Realtime websocket baseline complete; push fallback still pending |
 
 ### 12.2 Recent App Delivery Log
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
+| `uncommitted` | A06 | Added shared `app-auth` package and hardened BFF session exchange/refresh flows with replay and device-binding tests |
 | `0a955fa` | A05 | Added runnable Next.js merchant/admin apps with typed API clients and tests |
 | `7cb1032` | A02 | Added persona BFF server implementations and realtime gateway baseline with green tests |
 | `8386a50` | A01 | Added shared contracts and geo abstraction packages with initial test coverage |
@@ -481,7 +482,11 @@ Last updated: `2026-02-18`
    - consumer order read through `/app/v1/consumer/orders/{orderId}`
    - courier availability read through `/app/v1/courier/jobs/available`
    - merchant orders and admin incidents through `/app/v1/merchant/orders` and `/app/v1/admin/incidents`
-3. Runnable web stack validation executed using `npm run dev:web-stack` with successful checks for:
+3. App-session auth hardening validated with BFF route tests for:
+   - OIDC session exchange via `/app/v1/{persona}/session/exchange`
+   - rotating refresh via `/app/v1/{persona}/session/refresh`
+   - replay and device-binding enforcement
+4. Runnable web stack validation executed using `npm run dev:web-stack` with successful checks for:
    - `http://127.0.0.1:3001` merchant UI
    - `http://127.0.0.1:3002` admin UI
    - `http://127.0.0.1:3000/health` core-api health

@@ -18,6 +18,7 @@ Current implemented slice:
 1. `merchant` and `admin` web apps (Next.js App Router)
 2. persona BFFs (`consumer-bff`, `courier-bff`, `ops-bff`)
 3. `realtime-gateway` websocket baseline
+4. OIDC-backed app-session exchange with rotating refresh tokens in BFF layer
 
 ## 2. Topology
 
@@ -53,13 +54,22 @@ Current concrete adapter mappings:
 3. `ops-bff` -> `GET /api/v1/merchant/orders?merchantId=...`
 4. `ops-bff` -> `GET /internal/observability/logs` (incident projection source)
 
+Session endpoints:
+
+1. `POST /app/v1/consumer/session/exchange` and `POST /app/v1/consumer/session/refresh`
+2. `POST /app/v1/courier/session/exchange` and `POST /app/v1/courier/session/refresh`
+3. `POST /app/v1/merchant/session/exchange` and `POST /app/v1/merchant/session/refresh`
+4. `POST /app/v1/admin/session/exchange` and `POST /app/v1/admin/session/refresh`
+
 ## 4. Runtime Configuration
 
 BFF and web services are environment-driven:
 
 1. `CORE_API_BASE_URL` for BFFs (default `http://127.0.0.1:3000`)
 2. `OPS_BFF_BASE_URL` for web apps (default `http://127.0.0.1:4103`)
-3. fixed local ports in current dev stack:
+3. `APP_SESSION_JWT_SECRET` for BFF-issued app session JWT signing
+4. `OIDC_JWKS_URI`, `OIDC_ISSUER`, `OIDC_AUDIENCE` for provider-backed OIDC token verification (`dev:*` verifier fallback when unset)
+5. fixed local ports in current dev stack:
    - `core-api`: `3000`
    - `consumer-bff`: `4101`
    - `courier-bff`: `4102`
@@ -101,7 +111,6 @@ Implemented quality gates in this slice:
 
 ## 7. Remaining Work To Full V1
 
-1. OIDC + PKCE provider-backed verification and refresh hardening
-2. mobile app shells (consumer/courier) + KMP shared core
-3. feature flags, push fallback (APNs/FCM), and offline queue semantics
-4. e2e journey gates across all four surfaces
+1. mobile app shells (consumer/courier) + KMP shared core
+2. feature flags, push fallback (APNs/FCM), and offline queue semantics
+3. e2e journey gates across all four surfaces

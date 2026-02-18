@@ -19,6 +19,32 @@ export interface AppSession {
   expiresAt: string;
 }
 
+export interface AppSessionExchangeRequest {
+  oidcToken: string;
+  traceId: string;
+  deviceId?: string;
+}
+
+export interface AppSessionRefreshRequest {
+  refreshToken: string;
+  traceId: string;
+  deviceId?: string;
+}
+
+export interface AppSessionTokenPair {
+  tokenType: "Bearer";
+  accessToken: string;
+  refreshToken: string;
+  expiresInSeconds: number;
+  refreshExpiresInSeconds: number;
+  refreshExpiresAt: string;
+}
+
+export interface AppSessionExchangeResponse {
+  session: AppSession;
+  tokenPair: AppSessionTokenPair;
+}
+
 export interface CreateAppSessionInput {
   sessionId: string;
   userId: string;
