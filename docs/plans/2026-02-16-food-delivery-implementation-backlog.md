@@ -470,7 +470,7 @@ Last updated: `2026-02-18`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
-| `pending (current branch)` | A05 | Added runnable Next.js merchant/admin apps with typed API clients and tests |
+| `0a955fa` | A05 | Added runnable Next.js merchant/admin apps with typed API clients and tests |
 | `7cb1032` | A02 | Added persona BFF server implementations and realtime gateway baseline with green tests |
 | `8386a50` | A01 | Added shared contracts and geo abstraction packages with initial test coverage |
 
