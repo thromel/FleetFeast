@@ -22,6 +22,8 @@ import { PersistentCourierJobRepository } from "./platform/persistence/repositor
 import { PersistentPaymentIntentRepository } from "./platform/persistence/repositories/persistent-payment-intent-repository.js";
 import { PersistentRefundRequestRepository } from "./platform/persistence/repositories/persistent-refund-request-repository.js";
 import { PersistentPaymentAuditRepository } from "./platform/persistence/repositories/persistent-payment-audit-repository.js";
+import { PersistentPayoutBatchRepository } from "./platform/persistence/repositories/persistent-payout-batch-repository.js";
+import { PersistentSettlementLedgerRepository } from "./platform/persistence/repositories/persistent-settlement-ledger-repository.js";
 
 import { AuthError, AuthService } from "./modules/identity/auth-service.js";
 import {
@@ -1777,10 +1779,17 @@ export function createServer(options: CreateServerOptions = {}) {
     eventBus,
   );
   const settlementLedgerService = new SettlementLedgerService(
-    new InMemorySettlementLedgerRepository(),
+    persistenceEnabled
+      ? new PersistentSettlementLedgerRepository(documentStore!)
+      : new InMemorySettlementLedgerRepository(),
     eventBus,
   );
-  const payoutService = new PayoutService(new InMemoryPayoutBatchRepository(), eventBus);
+  const payoutService = new PayoutService(
+    persistenceEnabled
+      ? new PersistentPayoutBatchRepository(documentStore!)
+      : new InMemoryPayoutBatchRepository(),
+    eventBus,
+  );
   const payoutStatementService = new PayoutStatementService(
     new InMemoryPayoutStatementRepository(),
     eventBus,
