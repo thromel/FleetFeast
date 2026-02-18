@@ -414,7 +414,7 @@ Last updated: `2026-02-18`
 | E03 Merchant Catalog | Done | Menu versioning, availability, store status, prep-time endpoints implemented |
 | E04 Consumer Ordering | Done | Basket, zones, quotes, checkout, consumer order endpoints implemented |
 | E05 Order Orchestration | Done | State machine, cancellation matrix, dispatch request flow, timeline + rebuild implemented |
-| E06 Dispatch | Mostly done | Go dispatch scoring/assign/reassign/telemetry implemented; direct core->dispatch gRPC orchestration remains for full parity |
+| E06 Dispatch | Done | Go dispatch scoring/assign/reassign/telemetry implemented; core orchestration now supports dispatch assignment through gRPC client contracts |
 | E07 Payments | Done | Auth/capture/COD/refunds/audit flows implemented |
 | E08 Settlement/Payouts | In progress | Ledger, payout batches/schedules/statements done; reconciliation run/history + CSV ingest endpoint implemented; scheduled processor pull/import still pending |
 | E09 Notifications | Done | Fanout, templates/locale, retry+DLQ, receipts implemented |
@@ -425,6 +425,7 @@ Last updated: `2026-02-18`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
+| `fefc707` | E06-S02 / E05-S03 | Added core dispatch orchestration path with injectable gRPC assignment client and route coverage |
 | `8fe4b9f` | E08-S03 | Added settlement reconciliation CSV ingest endpoint with payload validation and test coverage |
 | `c8f98d0` | E08-S03 | Added reconciliation summary counters for dashboard-friendly API responses |
 | `3e1180f` | E11-S01 | Added persistent structured log repository and restart durability coverage |
@@ -446,6 +447,6 @@ Last updated: `2026-02-18`
 
 ### 11.3 Next Backend Features Queue
 
-1. Close remaining `E06/E05` integration gap with direct core orchestration path to dispatch gRPC contracts.
-2. Add scheduled processor settlement-file pull/import that feeds the reconciliation ingest path.
-3. Implement `E11-S04` backup/PITR and DR failover runbook automation.
+1. Add scheduled processor settlement-file pull/import that feeds the reconciliation ingest path.
+2. Implement `E11-S04` backup/PITR and DR failover runbook automation.
+3. Implement `E11-S06` security hardening checks and IAM least-privilege audit automation.
