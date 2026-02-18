@@ -24,6 +24,7 @@ import { PersistentRefundRequestRepository } from "./platform/persistence/reposi
 import { PersistentPaymentAuditRepository } from "./platform/persistence/repositories/persistent-payment-audit-repository.js";
 import { PersistentPayoutBatchRepository } from "./platform/persistence/repositories/persistent-payout-batch-repository.js";
 import { PersistentSettlementLedgerRepository } from "./platform/persistence/repositories/persistent-settlement-ledger-repository.js";
+import { PersistentManualReviewRepository } from "./platform/persistence/repositories/persistent-manual-review-repository.js";
 
 import { AuthError, AuthService } from "./modules/identity/auth-service.js";
 import {
@@ -1771,7 +1772,9 @@ export function createServer(options: CreateServerOptions = {}) {
   );
   const riskPolicyService = new RiskPolicyService(new InMemoryRiskPolicyRepository(), eventBus);
   const manualReviewService = new ManualReviewService(
-    new InMemoryManualReviewRepository(),
+    persistenceEnabled
+      ? new PersistentManualReviewRepository(documentStore!)
+      : new InMemoryManualReviewRepository(),
     eventBus,
   );
   const complianceAuditService = new ComplianceAuditService(
