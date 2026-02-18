@@ -11,6 +11,8 @@
     "test": "npm run build && node --test --test-concurrency=1 \"dist/**/*.test.js\""
   },
   "dependencies": {
+    "@grpc/grpc-js": "^1.14.3",
+    "@grpc/proto-loader": "^0.8.0",
     "pg": "^8.13.1",
     "redis": "^4.7.0"
   },

@@ -102,6 +102,7 @@ import { InMemoryOrderRepository } from "./modules/order-orchestration/in-memory
 import { InMemoryOrderTimelineRepository } from "./modules/order-orchestration/in-memory-order-timeline-repository.js";
 import { OrderTimelineService } from "./modules/order-orchestration/order-timeline-service.js";
 import { InMemoryCourierJobRepository } from "./modules/dispatch/in-memory-courier-job-repository.js";
+import { GrpcDispatchAssignmentClient } from "./modules/dispatch/grpc-dispatch-assignment-client.js";
 import {
   CourierJobNotFoundError,
   CourierJobStateConflictError,
@@ -161,6 +162,11 @@ import type {
 import type { UpdateStoreStatusInput } from "./modules/merchant-catalog/store-status-types.js";
 import type { OrderStatus } from "./modules/order-orchestration/types.js";
 import type { CourierJobStatus } from "./modules/dispatch/types.js";
+import type {
+  DispatchAssignmentCandidate,
+  DispatchAssignmentClient,
+  DispatchAssignmentInput,
+} from "./modules/dispatch/dispatch-assignment-client.js";
 import type { PaymentMethod } from "./modules/payments/types.js";
 import type {
   GeneratePayoutBatchInput,
@@ -206,6 +212,7 @@ export interface CreateServerOptions {
   enablePersistence?: boolean;
   documentStore?: DocumentStore;
   eventBroker?: EventBroker;
+  dispatchAssignmentClient?: DispatchAssignmentClient;
 }
 
 function resolveDocumentStore(options: CreateServerOptions): DocumentStore | undefined {
@@ -236,6 +243,21 @@ function resolveEventBroker(options: CreateServerOptions): EventBroker | undefin
 
   const redisUrl = process.env.REDIS_URL ?? "redis://127.0.0.1:6379";
   return new RedisEventBroker(redisUrl);
+}
+
+function resolveDispatchAssignmentClient(
+  options: CreateServerOptions,
+): DispatchAssignmentClient | undefined {
+  if (options.dispatchAssignmentClient) {
+    return options.dispatchAssignmentClient;
+  }
+
+  const target = process.env.DISPATCH_GRPC_TARGET;
+  if (!target || target.trim().length === 0) {
+    return undefined;
+  }
+
+  return new GrpcDispatchAssignmentClient(target);
 }
 
 function sendJson(
@@ -824,6 +846,90 @@ function validateCourierTelemetryPayload(payload: Record<string, unknown>): {
     observedAtEpochMs,
     speedMps,
     distanceToDropoffMeters,
+  };
+}
+
+function validateDispatchAssignmentPayload(
+  payload: Record<string, unknown>,
+): Omit<DispatchAssignmentInput, "orderId"> | undefined {
+  if (Object.keys(payload).length === 0) {
+    return undefined;
+  }
+
+  const candidates = payload.candidates;
+  const rawSlaPressure = payload.slaPressure;
+  const rawMerchantSelfDeliveryEnabled = payload.merchantSelfDeliveryEnabled;
+
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    throw new Error("INVALID_DISPATCH_REQUEST_PAYLOAD");
+  }
+
+  const normalizedCandidates = candidates.map((candidate) => {
+    if (
+      typeof candidate !== "object" ||
+      candidate === null ||
+      !("courierId" in candidate) ||
+      !("distanceMeters" in candidate) ||
+      !("available" in candidate) ||
+      !("activeOrders" in candidate) ||
+      !("withinRestWindow" in candidate)
+    ) {
+      throw new Error("INVALID_DISPATCH_REQUEST_PAYLOAD");
+    }
+
+    const parsed = candidate as {
+      courierId: unknown;
+      distanceMeters: unknown;
+      available: unknown;
+      activeOrders: unknown;
+      withinRestWindow: unknown;
+    };
+
+    if (
+      typeof parsed.courierId !== "string" ||
+      parsed.courierId.trim().length === 0 ||
+      typeof parsed.distanceMeters !== "number" ||
+      !Number.isFinite(parsed.distanceMeters) ||
+      parsed.distanceMeters < 0 ||
+      typeof parsed.available !== "boolean" ||
+      typeof parsed.activeOrders !== "number" ||
+      !Number.isInteger(parsed.activeOrders) ||
+      parsed.activeOrders < 0 ||
+      typeof parsed.withinRestWindow !== "boolean"
+    ) {
+      throw new Error("INVALID_DISPATCH_REQUEST_PAYLOAD");
+    }
+
+    const normalized: DispatchAssignmentCandidate = {
+      courierId: parsed.courierId,
+      distanceMeters: parsed.distanceMeters,
+      available: parsed.available,
+      activeOrders: parsed.activeOrders,
+      withinRestWindow: parsed.withinRestWindow,
+    };
+
+    return normalized;
+  });
+
+  const slaPressure = rawSlaPressure ?? 0;
+  if (
+    typeof slaPressure !== "number" ||
+    !Number.isFinite(slaPressure) ||
+    slaPressure < 0 ||
+    slaPressure > 1
+  ) {
+    throw new Error("INVALID_DISPATCH_REQUEST_PAYLOAD");
+  }
+
+  const merchantSelfDeliveryEnabled = rawMerchantSelfDeliveryEnabled ?? false;
+  if (typeof merchantSelfDeliveryEnabled !== "boolean") {
+    throw new Error("INVALID_DISPATCH_REQUEST_PAYLOAD");
+  }
+
+  return {
+    candidates: normalizedCandidates,
+    slaPressure,
+    merchantSelfDeliveryEnabled,
   };
 }
 
@@ -1851,6 +1957,7 @@ export function createServer(options: CreateServerOptions = {}) {
   }
 
   const eventBroker = resolveEventBroker(options);
+  const dispatchAssignmentClient = resolveDispatchAssignmentClient(options);
   const eventBus = persistenceEnabled
     ? new DurableEventBus(documentStore, eventBroker)
     : new InMemoryEventBus();
@@ -2678,7 +2785,36 @@ export function createServer(options: CreateServerOptions = {}) {
 
       if (request.method === "POST" && orderDispatchRequestRouteMatch) {
         const orderId = decodeURIComponent(orderDispatchRequestRouteMatch[1] ?? "");
+        const payload = await parseJsonBody(request);
+        const assignmentInput = validateDispatchAssignmentPayload(payload);
         const order = await orderService.requestDispatch(orderId);
+
+        if (
+          order.status === "DISPATCH_PENDING" &&
+          assignmentInput &&
+          dispatchAssignmentClient !== undefined
+        ) {
+          const assignment = await dispatchAssignmentClient.assign({
+            orderId,
+            ...assignmentInput,
+          });
+
+          if (assignment.mode === "COURIER" && assignment.courierId) {
+            const assignedOrder = await orderService.assignCourier(orderId, assignment.courierId);
+            sendJson(response, 200, {
+              ...assignedOrder,
+              assignment,
+            });
+            return;
+          }
+
+          sendJson(response, 200, {
+            ...order,
+            assignment,
+          });
+          return;
+        }
+
         sendJson(response, 200, order);
         return;
       }
@@ -3088,6 +3224,7 @@ export function createServer(options: CreateServerOptions = {}) {
             "INVALID_COURIER_JOB_QUERY",
             "INVALID_COURIER_JOB_COURIER_PAYLOAD",
             "INVALID_COURIER_TELEMETRY_PAYLOAD",
+            "INVALID_DISPATCH_REQUEST_PAYLOAD",
             "INVALID_SUPPORT_TICKET_PAYLOAD",
             "INVALID_SUPPORT_INTERVENTION_PAYLOAD",
             "INVALID_SUPPORT_SLA_PAYLOAD",
