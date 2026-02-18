@@ -470,7 +470,7 @@ Last updated: `2026-02-18`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
-| `uncommitted` | A05 | Added `shared-kmp` feature-flag client with TTL cache/refresh semantics and deterministic Docker KMP test execution |
+| `daf8c60` | A05 | Added `shared-kmp` feature-flag client with TTL cache/refresh semantics and deterministic Docker KMP test execution |
 | `7a2299f` | A05 | Added persistent offline-queue store abstraction (`OfflineActionStore`) and rehydration tests; hardened Docker KMP test command |
 | `819efea` | A05 | Added typed `shared-kmp` BFF/realtime clients over abstract transport with Kotlin tests for route/payload mapping |
 | `4320cee` | A05 | Added KMP shared core scaffolding with offline queue tests and initial native iOS/Android shell directories |
