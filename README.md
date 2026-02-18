@@ -206,6 +206,26 @@ cd ../dispatch-engine
 go test ./...
 ```
 
+## Runnable App Stack (Current)
+
+You can run a connected local app slice (core backend + BFFs + merchant/admin web apps) with:
+
+```bash
+npm run dev:web-stack
+```
+
+Then open:
+
+- `http://127.0.0.1:3001` -> merchant web app
+- `http://127.0.0.1:3002` -> admin web app
+- `http://127.0.0.1:3000/health` -> core-api health
+
+Current app-layer connectivity:
+
+- web apps call `ops-bff` routes under `/app/v1/*`,
+- BFFs call backend routes under `/api/v1/*` and `/internal/*`,
+- realtime gateway websocket baseline is active.
+
 ## Deployment and Costing
 
 The deployment and costing strategy is documented as staged environments (`dev`, `staging`, `prod`) with phased spend controls and guardrails.
@@ -213,6 +233,7 @@ The deployment and costing strategy is documented as staged environments (`dev`,
 See:
 
 - `docs/architecture/system-architecture-v1.md`
+- `docs/architecture/app-architecture-v1.md`
 - `docs/architecture/deployment-and-cost-estimates.md`
 - `docs/architecture/api-and-event-contracts-v1.md`
 - `docs/requirements/functional-requirements-ddd.md`

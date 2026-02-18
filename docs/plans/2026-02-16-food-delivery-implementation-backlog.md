@@ -462,7 +462,7 @@ Last updated: `2026-02-18`
 | A02 Persona BFF services + realtime gateway skeleton | Done | `consumer-bff`, `courier-bff`, `ops-bff`, and `realtime-gateway` implemented with route-level tests |
 | A03 BFF-to-core backend connectivity | Done | Core API adapters implemented in all three BFFs with test coverage against backend HTTP stubs |
 | A04 App runtime bootstrap for BFF services | Done | `main.ts` entrypoints and `start` scripts added for local runtime |
-| A05 Mobile/web app surfaces (native + Next.js) | Not started | Planned next after app-services hardening and auth integration |
+| A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js `web-merchant` and `web-admin` apps implemented with live ops-bff integration; mobile surfaces pending |
 | A06 OIDC+PKCE and app-session exchange hardening | In progress | Session exchange endpoints exist; provider-backed token verification and refresh hardening pending |
 | A07 Push fallback (APNs/FCM) and full realtime fanout | Not started | Realtime websocket baseline complete; push fallback still pending |
 
@@ -470,6 +470,7 @@ Last updated: `2026-02-18`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
+| `pending (current branch)` | A05 | Added runnable Next.js merchant/admin apps with typed API clients and tests |
 | `7cb1032` | A02 | Added persona BFF server implementations and realtime gateway baseline with green tests |
 | `8386a50` | A01 | Added shared contracts and geo abstraction packages with initial test coverage |
 
@@ -480,3 +481,7 @@ Last updated: `2026-02-18`
    - consumer order read through `/app/v1/consumer/orders/{orderId}`
    - courier availability read through `/app/v1/courier/jobs/available`
    - merchant orders and admin incidents through `/app/v1/merchant/orders` and `/app/v1/admin/incidents`
+3. Runnable web stack validation executed using `npm run dev:web-stack` with successful checks for:
+   - `http://127.0.0.1:3001` merchant UI
+   - `http://127.0.0.1:3002` admin UI
+   - `http://127.0.0.1:3000/health` core-api health
