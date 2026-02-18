@@ -9,7 +9,7 @@ import {
 
 test("creates support ticket with OPEN status", async () => {
   const service = new SupportTicketService(new InMemorySupportTicketRepository(), {
-    getOrderTimeline: () => [],
+    getOrderTimeline: async () => [],
     getPaymentAudit: async () => [],
   });
 
@@ -26,7 +26,7 @@ test("creates support ticket with OPEN status", async () => {
 
 test("builds correlated timeline from order and payment sources", async () => {
   const service = new SupportTicketService(new InMemorySupportTicketRepository(), {
-    getOrderTimeline: () => [
+    getOrderTimeline: async () => [
       {
         orderId: "order-2",
         eventType: "order.created.v1",
@@ -63,7 +63,7 @@ test("builds correlated timeline from order and payment sources", async () => {
 
 test("throws when loading timeline for unknown ticket", async () => {
   const service = new SupportTicketService(new InMemorySupportTicketRepository(), {
-    getOrderTimeline: () => [],
+    getOrderTimeline: async () => [],
     getPaymentAudit: async () => [],
   });
 

@@ -58,17 +58,17 @@ test("rebuild replays event log into immutable timeline entries", async () => {
   await orderService.merchantAcceptOrder(order.id);
   await orderService.requestDispatch(order.id);
 
-  const before = timelineService.getTimeline(order.id);
+  const before = await timelineService.getTimeline(order.id);
   assert.deepEqual(before.map((entry) => entry.eventType), [
     "order.created.v1",
     "order.confirmed.v1",
     "dispatch.assignment.requested.v1",
   ]);
 
-  const rebuild = timelineService.rebuildFromEventLog();
+  const rebuild = await timelineService.rebuildFromEventLog();
   assert.equal(rebuild.entriesRebuilt, before.length);
 
-  const after = timelineService.getTimeline(order.id);
+  const after = await timelineService.getTimeline(order.id);
   assert.deepEqual(after.map((entry) => entry.eventType), before.map((entry) => entry.eventType));
   assert.equal(after.length, before.length);
 });

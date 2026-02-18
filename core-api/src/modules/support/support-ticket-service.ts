@@ -47,8 +47,7 @@ export class SupportTicketService {
       throw new SupportTicketNotFoundError(ticketId);
     }
 
-    const orderTimelineEntries = this.correlationSources
-      .getOrderTimeline(ticket.orderId)
+    const orderTimelineEntries = (await this.correlationSources.getOrderTimeline(ticket.orderId))
       .map<SupportTimelineEntry>((entry) => ({
         sourceType: "ORDER_TIMELINE",
         referenceId: entry.eventType,

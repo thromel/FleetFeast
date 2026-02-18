@@ -33,6 +33,7 @@ import { PersistentNotificationQueueRepository } from "./platform/persistence/re
 import { PersistentNotificationRetryRepository } from "./platform/persistence/repositories/persistent-notification-retry-repository.js";
 import { PersistentNotificationReceiptRepository } from "./platform/persistence/repositories/persistent-notification-receipt-repository.js";
 import { PersistentDeliveryZoneRepository } from "./platform/persistence/repositories/persistent-delivery-zone-repository.js";
+import { PersistentOrderTimelineRepository } from "./platform/persistence/repositories/persistent-order-timeline-repository.js";
 
 import { AuthError, AuthService } from "./modules/identity/auth-service.js";
 import {
@@ -1713,7 +1714,9 @@ export function createServer(options: CreateServerOptions = {}) {
   const orderRepository = persistenceEnabled
     ? new PersistentOrderRepository(documentStore!)
     : new InMemoryOrderRepository();
-  const orderTimelineRepository = new InMemoryOrderTimelineRepository();
+  const orderTimelineRepository = persistenceEnabled
+    ? new PersistentOrderTimelineRepository(documentStore!)
+    : new InMemoryOrderTimelineRepository();
   const orderTimelineService = new OrderTimelineService(eventBus, orderTimelineRepository);
   const orderService = new OrderService(
     checkoutRepository,
@@ -2070,7 +2073,7 @@ export function createServer(options: CreateServerOptions = {}) {
 
       if (request.method === "GET" && consumerOrderTimelineRouteMatch) {
         const orderId = decodeURIComponent(consumerOrderTimelineRouteMatch[1] ?? "");
-        const entries = orderTimelineService.getTimeline(orderId);
+        const entries = await orderTimelineService.getTimeline(orderId);
         sendJson(response, 200, { orderId, entries });
         return;
       }
@@ -2433,7 +2436,7 @@ export function createServer(options: CreateServerOptions = {}) {
       }
 
       if (request.method === "POST" && pathname === "/internal/orders/timeline/rebuild") {
-        const result = orderTimelineService.rebuildFromEventLog();
+        const result = await orderTimelineService.rebuildFromEventLog();
         sendJson(response, 200, result);
         return;
       }

@@ -25,21 +25,21 @@ export class OrderTimelineService {
     private readonly repository: InMemoryOrderTimelineRepository,
   ) {}
 
-  projectEvent(event: DomainEvent): void {
+  async projectEvent(event: DomainEvent): Promise<void> {
     const entry = this.toTimelineEntry(event);
     if (!entry) {
       return;
     }
 
-    this.repository.append(entry);
+    await this.repository.append(entry);
   }
 
-  getTimeline(orderId: string): OrderTimelineEntry[] {
+  async getTimeline(orderId: string): Promise<OrderTimelineEntry[]> {
     return this.repository.getByOrderId(orderId);
   }
 
-  rebuildFromEventLog(): RebuildSummary {
-    this.repository.clear();
+  async rebuildFromEventLog(): Promise<RebuildSummary> {
+    await this.repository.clear();
     let entriesRebuilt = 0;
 
     for (const event of this.eventBus.events) {
@@ -48,13 +48,13 @@ export class OrderTimelineService {
         continue;
       }
 
-      this.repository.append(entry);
+      await this.repository.append(entry);
       entriesRebuilt += 1;
     }
 
     return {
       entriesRebuilt,
-      ordersRebuilt: this.repository.orderCount(),
+      ordersRebuilt: await this.repository.orderCount(),
     };
   }
 

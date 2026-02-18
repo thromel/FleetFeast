@@ -96,7 +96,7 @@ export class OrderService {
     };
 
     await this.orderRepository.save(order);
-    this.publishEvent({
+    await this.publishEvent({
       type: "order.created.v1",
       occurredAt: now,
       payload: {
@@ -127,7 +127,7 @@ export class OrderService {
     };
 
     await this.orderRepository.save(updated);
-    this.publishEvent({
+    await this.publishEvent({
       type: "order.confirmed.v1",
       occurredAt: updated.updatedAt,
       payload: {
@@ -156,7 +156,7 @@ export class OrderService {
     };
 
     await this.orderRepository.save(updated);
-    this.publishEvent({
+    await this.publishEvent({
       type: "order.cancelled.v1",
       occurredAt: updated.updatedAt,
       payload: {
@@ -186,7 +186,7 @@ export class OrderService {
     };
 
     await this.orderRepository.save(updated);
-    this.publishEvent({
+    await this.publishEvent({
       type: "dispatch.assignment.requested.v1",
       occurredAt: updated.updatedAt,
       payload: {
@@ -219,7 +219,7 @@ export class OrderService {
     };
 
     await this.orderRepository.save(updated);
-    this.publishEvent({
+    await this.publishEvent({
       type: "dispatch.assignment.completed.v1",
       occurredAt: updated.updatedAt,
       payload: {
@@ -251,7 +251,7 @@ export class OrderService {
     };
 
     await this.orderRepository.save(updated);
-    this.publishEvent({
+    await this.publishEvent({
       type: "order.picked_up.v1",
       occurredAt: updated.updatedAt,
       payload: {
@@ -283,7 +283,7 @@ export class OrderService {
     };
 
     await this.orderRepository.save(updated);
-    this.publishEvent({
+    await this.publishEvent({
       type: "order.delivered.v1",
       occurredAt: updated.updatedAt,
       payload: {
@@ -319,7 +319,7 @@ export class OrderService {
     }
 
     const now = new Date().toISOString();
-    this.publishEvent({
+    await this.publishEvent({
       type: "order.cancel_requested.v1",
       occurredAt: now,
       payload: {
@@ -338,7 +338,7 @@ export class OrderService {
     };
 
     await this.orderRepository.save(updated);
-    this.publishEvent({
+    await this.publishEvent({
       type: "order.cancelled.v1",
       occurredAt: now,
       payload: {
@@ -370,8 +370,10 @@ export class OrderService {
     });
   }
 
-  private publishEvent(event: DomainEvent): void {
+  private async publishEvent(event: DomainEvent): Promise<void> {
     this.eventBus.publish(event);
-    this.timelineService?.projectEvent(event);
+    if (this.timelineService) {
+      await this.timelineService.projectEvent(event);
+    }
   }
 }

@@ -3,21 +3,21 @@ import type { OrderTimelineEntry } from "./timeline-types.js";
 export class InMemoryOrderTimelineRepository {
   private readonly entriesByOrder = new Map<string, OrderTimelineEntry[]>();
 
-  append(entry: OrderTimelineEntry): void {
+  async append(entry: OrderTimelineEntry): Promise<void> {
     const current = this.entriesByOrder.get(entry.orderId) ?? [];
     this.entriesByOrder.set(entry.orderId, [...current, { ...entry }]);
   }
 
-  getByOrderId(orderId: string): OrderTimelineEntry[] {
+  async getByOrderId(orderId: string): Promise<OrderTimelineEntry[]> {
     const entries = this.entriesByOrder.get(orderId) ?? [];
     return entries.map((entry) => ({ ...entry, details: { ...entry.details } }));
   }
 
-  clear(): void {
+  async clear(): Promise<void> {
     this.entriesByOrder.clear();
   }
 
-  orderCount(): number {
+  async orderCount(): Promise<number> {
     return this.entriesByOrder.size;
   }
 }

@@ -37,7 +37,7 @@ export interface SupportTicketTimelineView {
 }
 
 export interface SupportCorrelationSources {
-  getOrderTimeline(orderId: string): OrderTimelineEntry[];
+  getOrderTimeline(orderId: string): Promise<OrderTimelineEntry[]>;
   getPaymentAudit(orderId: string): Promise<PaymentAuditRecord[]>;
 }
 
