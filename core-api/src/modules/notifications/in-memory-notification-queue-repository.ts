@@ -9,7 +9,7 @@ export class InMemoryNotificationQueueRepository {
     this.idempotencyKeys.add(item.idempotencyKey);
   }
 
-  hasIdempotencyKey(idempotencyKey: string): boolean {
+  async hasIdempotencyKey(idempotencyKey: string): Promise<boolean> {
     return this.idempotencyKeys.has(idempotencyKey);
   }
 

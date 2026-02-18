@@ -29,6 +29,9 @@ import { PersistentSupportTicketRepository } from "./platform/persistence/reposi
 import { PersistentSupportEscalationRepository } from "./platform/persistence/repositories/persistent-support-escalation-repository.js";
 import { PersistentComplianceAuditRepository } from "./platform/persistence/repositories/persistent-compliance-audit-repository.js";
 import { PersistentPayoutStatementRepository } from "./platform/persistence/repositories/persistent-payout-statement-repository.js";
+import { PersistentNotificationQueueRepository } from "./platform/persistence/repositories/persistent-notification-queue-repository.js";
+import { PersistentNotificationRetryRepository } from "./platform/persistence/repositories/persistent-notification-retry-repository.js";
+import { PersistentNotificationReceiptRepository } from "./platform/persistence/repositories/persistent-notification-receipt-repository.js";
 
 import { AuthError, AuthService } from "./modules/identity/auth-service.js";
 import {
@@ -1811,16 +1814,22 @@ export function createServer(options: CreateServerOptions = {}) {
   );
   const notificationTemplateService = new NotificationTemplateService(eventBus);
   const notificationFanoutService = new NotificationFanoutService(
-    new InMemoryNotificationQueueRepository(),
+    persistenceEnabled
+      ? new PersistentNotificationQueueRepository(documentStore!)
+      : new InMemoryNotificationQueueRepository(),
     eventBus,
     notificationTemplateService,
   );
   const notificationRetryService = new NotificationRetryService(
-    new InMemoryNotificationRetryRepository(),
+    persistenceEnabled
+      ? new PersistentNotificationRetryRepository(documentStore!)
+      : new InMemoryNotificationRetryRepository(),
     eventBus,
   );
   const notificationReceiptService = new NotificationReceiptService(
-    new InMemoryNotificationReceiptRepository(),
+    persistenceEnabled
+      ? new PersistentNotificationReceiptRepository(documentStore!)
+      : new InMemoryNotificationReceiptRepository(),
     eventBus,
   );
   const deliveryZoneRepository = new InMemoryDeliveryZoneRepository();
@@ -2375,7 +2384,7 @@ export function createServer(options: CreateServerOptions = {}) {
           throw new Error("INVALID_NOTIFICATION_RECEIPT_QUERY");
         }
 
-        const receipts = notificationReceiptService.listReceiptsByEntity(entityId);
+        const receipts = await notificationReceiptService.listReceiptsByEntity(entityId);
         sendJson(response, 200, { entityId, receipts });
         return;
       }

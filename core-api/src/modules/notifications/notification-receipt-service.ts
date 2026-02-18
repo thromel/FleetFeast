@@ -40,7 +40,7 @@ export class NotificationReceiptService {
     return receipt;
   }
 
-  listReceiptsByEntity(entityId: string): NotificationDeliveryReceipt[] {
+  async listReceiptsByEntity(entityId: string): Promise<NotificationDeliveryReceipt[]> {
     return this.repository.listByEntity(entityId);
   }
 }

@@ -7,7 +7,7 @@ export class InMemoryNotificationReceiptRepository {
     this.receipts.push(receipt);
   }
 
-  listByEntity(entityId: string): NotificationDeliveryReceipt[] {
+  async listByEntity(entityId: string): Promise<NotificationDeliveryReceipt[]> {
     return this.receipts
       .filter((receipt) => receipt.entityId === entityId)
       .sort((left, right) => left.recordedAt.localeCompare(right.recordedAt));

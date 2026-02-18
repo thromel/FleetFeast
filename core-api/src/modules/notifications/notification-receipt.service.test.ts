@@ -42,6 +42,6 @@ test("lists recorded receipts for support lookup by entity id", async () => {
     status: "DELIVERED",
   });
 
-  const receipts = service.listReceiptsByEntity("order-2");
+  const receipts = await service.listReceiptsByEntity("order-2");
   assert.equal(receipts.length, 2);
 });

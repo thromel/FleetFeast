@@ -44,7 +44,7 @@ export class NotificationFanoutService {
       const templateKey = templateResolution.templateKey;
       const idempotencyKey = `${channel}:${templateKey}:${input.entityId}`;
 
-      if (this.queueRepository.hasIdempotencyKey(idempotencyKey)) {
+      if (await this.queueRepository.hasIdempotencyKey(idempotencyKey)) {
         continue;
       }
 
