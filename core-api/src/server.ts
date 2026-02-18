@@ -32,6 +32,7 @@ import { PersistentPayoutStatementRepository } from "./platform/persistence/repo
 import { PersistentNotificationQueueRepository } from "./platform/persistence/repositories/persistent-notification-queue-repository.js";
 import { PersistentNotificationRetryRepository } from "./platform/persistence/repositories/persistent-notification-retry-repository.js";
 import { PersistentNotificationReceiptRepository } from "./platform/persistence/repositories/persistent-notification-receipt-repository.js";
+import { PersistentDeliveryZoneRepository } from "./platform/persistence/repositories/persistent-delivery-zone-repository.js";
 
 import { AuthError, AuthService } from "./modules/identity/auth-service.js";
 import {
@@ -1832,7 +1833,9 @@ export function createServer(options: CreateServerOptions = {}) {
       : new InMemoryNotificationReceiptRepository(),
     eventBus,
   );
-  const deliveryZoneRepository = new InMemoryDeliveryZoneRepository();
+  const deliveryZoneRepository = persistenceEnabled
+    ? new PersistentDeliveryZoneRepository(documentStore!)
+    : new InMemoryDeliveryZoneRepository();
   const deliveryZoneService = new DeliveryZoneService(deliveryZoneRepository);
 
   return createHttpServer(async (request, response) => {
