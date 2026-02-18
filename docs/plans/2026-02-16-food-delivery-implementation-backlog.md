@@ -462,7 +462,7 @@ Last updated: `2026-02-18`
 | A02 Persona BFF services + realtime gateway skeleton | Done | `consumer-bff`, `courier-bff`, `ops-bff`, and `realtime-gateway` implemented with route-level tests |
 | A03 BFF-to-core backend connectivity | Done | Core API adapters implemented in all three BFFs with test coverage against backend HTTP stubs |
 | A04 App runtime bootstrap for BFF services | Done | `main.ts` entrypoints and `start` scripts added for local runtime |
-| A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js `web-merchant` and `web-admin` apps implemented with live ops-bff integration; mobile surfaces pending |
+| A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js surfaces are live; added initial mobile scaffold with tested `shared-kmp` offline queue/contracts and iOS/Android shell directories |
 | A06 OIDC+PKCE and app-session exchange hardening | Done | Added shared OIDC verifier (JWKS + dev fallback), persona-aware role checks, rotating refresh tokens, replay detection, and device-bound refresh validation across all BFFs |
 | A07 Push fallback (APNs/FCM) and full realtime fanout | Done | Added provider-specific APNs/FCM fallback adapters, internal publish endpoint with optional API-key guard, and full realtime gateway route/adapter test coverage |
 
@@ -470,6 +470,7 @@ Last updated: `2026-02-18`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
+| `uncommitted` | A05 | Added KMP shared core scaffolding with offline queue tests and initial native iOS/Android shell directories |
 | `9fd80bb` | A07 | Added provider-specific APNs/FCM push adapters and `/app/v1/realtime/publish` fanout endpoint with API-key option |
 | `1d039fd` | A07 | Added realtime-gateway push fallback registration and dispatch baseline with websocket-vs-push behavior tests |
 | `3bead32` | A06 | Added shared `app-auth` package and hardened BFF session exchange/refresh flows with replay and device-binding tests |
@@ -499,3 +500,6 @@ Last updated: `2026-02-18`
    - APNs and FCM payload routing through provider-specific adapters
    - `/app/v1/realtime/publish` websocket fanout path
    - optional `REALTIME_PUBLISH_API_KEY` authorization enforcement
+7. Mobile shared-core baseline validated via Docker Gradle KMP tests:
+   - `npm run test:mobile-shared-kmp`
+   - verifies offline action queue idempotency and retry semantics in `apps/mobile/shared-kmp`
