@@ -125,6 +125,7 @@ import { InMemoryPayoutBatchRepository } from "./modules/settlement/in-memory-pa
 import { InMemoryPayoutStatementRepository } from "./modules/settlement/in-memory-payout-statement-repository.js";
 import { PayoutService } from "./modules/settlement/payout-service.js";
 import { PayoutStatementService } from "./modules/settlement/payout-statement-service.js";
+import { SettlementReconciliationService } from "./modules/settlement/settlement-reconciliation-service.js";
 import { InMemorySupportTicketRepository } from "./modules/support/in-memory-support-ticket-repository.js";
 import { InMemorySupportEscalationRepository } from "./modules/support/in-memory-support-escalation-repository.js";
 import { SupportInterventionService } from "./modules/support/support-intervention-service.js";
@@ -164,6 +165,7 @@ import type {
   PostSettlementJournalInput,
   PayoutEntityType,
   PublishPayoutStatementInput,
+  ReconcileSettlementInput,
 } from "./modules/settlement/types.js";
 import type {
   CreateSupportTicketInput,
@@ -1095,6 +1097,57 @@ function validateSettlementJournalPayload(payload: Record<string, unknown>): Pos
   };
 }
 
+function validateSettlementReconciliationPayload(
+  payload: Record<string, unknown>,
+): ReconcileSettlementInput {
+  const expectedRecords = payload.expectedRecords;
+  const actualRecords = payload.actualRecords;
+  const toleranceCents = payload.toleranceCents;
+
+  if (
+    !Array.isArray(expectedRecords) ||
+    !Array.isArray(actualRecords) ||
+    typeof toleranceCents !== "number" ||
+    toleranceCents < 0 ||
+    !Number.isFinite(toleranceCents)
+  ) {
+    throw new Error("INVALID_SETTLEMENT_RECONCILIATION_PAYLOAD");
+  }
+
+  const normalizeRecord = (record: unknown) => {
+    if (
+      typeof record !== "object" ||
+      record === null ||
+      !("entityId" in record) ||
+      !("amount" in record)
+    ) {
+      throw new Error("INVALID_SETTLEMENT_RECONCILIATION_PAYLOAD");
+    }
+
+    const candidate = record as { entityId: unknown; amount: unknown };
+    if (
+      typeof candidate.entityId !== "string" ||
+      candidate.entityId.trim().length === 0 ||
+      typeof candidate.amount !== "number" ||
+      !Number.isFinite(candidate.amount) ||
+      candidate.amount < 0
+    ) {
+      throw new Error("INVALID_SETTLEMENT_RECONCILIATION_PAYLOAD");
+    }
+
+    return {
+      entityId: candidate.entityId,
+      amount: candidate.amount,
+    };
+  };
+
+  return {
+    expectedRecords: expectedRecords.map((record) => normalizeRecord(record)),
+    actualRecords: actualRecords.map((record) => normalizeRecord(record)),
+    toleranceCents,
+  };
+}
+
 function validatePayoutBatchPayload(payload: Record<string, unknown>): GeneratePayoutBatchInput {
   const scheduleId = payload.scheduleId;
   const runAt = payload.runAt;
@@ -1841,6 +1894,7 @@ export function createServer(options: CreateServerOptions = {}) {
       : new InMemorySettlementLedgerRepository(),
     eventBus,
   );
+  const settlementReconciliationService = new SettlementReconciliationService(eventBus);
   const payoutService = new PayoutService(
     persistenceEnabled
       ? new PersistentPayoutBatchRepository(documentStore!)
@@ -2354,6 +2408,14 @@ export function createServer(options: CreateServerOptions = {}) {
         const input = validateSettlementJournalPayload(payload);
         const journal = await settlementLedgerService.postJournalEntry(input);
         sendJson(response, 201, journal);
+        return;
+      }
+
+      if (request.method === "POST" && pathname === "/internal/settlement/reconciliation/run") {
+        const payload = await parseJsonBody(request);
+        const input = validateSettlementReconciliationPayload(payload);
+        const result = await settlementReconciliationService.reconcile(input);
+        sendJson(response, 200, result);
         return;
       }
 
@@ -2909,6 +2971,7 @@ export function createServer(options: CreateServerOptions = {}) {
             "INVALID_REFUND_REQUEST_PAYLOAD",
             "INVALID_REFUND_APPROVAL_PAYLOAD",
             "INVALID_SETTLEMENT_JOURNAL_PAYLOAD",
+            "INVALID_SETTLEMENT_RECONCILIATION_PAYLOAD",
             "INVALID_PAYOUT_BATCH_PAYLOAD",
             "INVALID_PAYOUT_SCHEDULE_RUN_PAYLOAD",
             "INVALID_PAYOUT_STATEMENT_PAYLOAD",
