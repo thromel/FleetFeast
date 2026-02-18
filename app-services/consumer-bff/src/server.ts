@@ -14,6 +14,41 @@ export interface ConsumerBffDependencies {
   getOrderById(orderId: string): Promise<ConsumerOrderView>;
 }
 
+export interface ConsumerCoreApiDependencyOptions {
+  coreApiBaseUrl: string;
+  fetchImpl?: typeof fetch;
+}
+
+export function createConsumerCoreApiDependencies(
+  options: ConsumerCoreApiDependencyOptions,
+): ConsumerBffDependencies {
+  const baseUrl = options.coreApiBaseUrl.replace(/\/+$/, "");
+  const fetchImpl = options.fetchImpl ?? fetch;
+
+  return {
+    async getOrderById(orderId: string): Promise<ConsumerOrderView> {
+      const response = await fetchImpl(
+        `${baseUrl}/api/v1/consumer/orders/${encodeURIComponent(orderId)}`,
+      );
+      if (!response.ok) {
+        throw new Error("CORE_API_CONSUMER_ORDER_FETCH_FAILED");
+      }
+
+      const payload = (await response.json()) as {
+        id: string;
+        status: string;
+        timelineVersion?: number;
+      };
+
+      return {
+        id: payload.id,
+        status: payload.status,
+        timelineVersion: typeof payload.timelineVersion === "number" ? payload.timelineVersion : 0,
+      };
+    },
+  };
+}
+
 export function createConsumerBffServer(
   dependencies: ConsumerBffDependencies,
 ): FastifyInstance {
@@ -69,4 +104,12 @@ export function createConsumerBffServer(
   });
 
   return app;
+}
+
+export function createConsumerBffServerFromEnv(): FastifyInstance {
+  return createConsumerBffServer(
+    createConsumerCoreApiDependencies({
+      coreApiBaseUrl: process.env.CORE_API_BASE_URL ?? "http://127.0.0.1:3000",
+    }),
+  );
 }

@@ -1,6 +1,24 @@
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import { createAppSession } from "@fleetfeast/shared-contracts";
+export function createCourierCoreApiDependencies(options) {
+    const baseUrl = options.coreApiBaseUrl.replace(/\/+$/, "");
+    const fetchImpl = options.fetchImpl ?? fetch;
+    return {
+        async listAvailableJobs() {
+            const response = await fetchImpl(`${baseUrl}/api/v1/courier/jobs/available`);
+            if (!response.ok) {
+                throw new Error("CORE_API_COURIER_AVAILABLE_JOBS_FETCH_FAILED");
+            }
+            const payload = (await response.json());
+            return (payload.jobs ?? []).map((job) => ({
+                jobId: job.jobId,
+                orderId: job.orderId,
+                status: job.status,
+            }));
+        },
+    };
+}
 export function createCourierBffServer(dependencies) {
     const app = Fastify();
     app.post("/app/v1/courier/session/exchange", async (request, reply) => {
@@ -33,5 +51,10 @@ export function createCourierBffServer(dependencies) {
         return { jobs };
     });
     return app;
+}
+export function createCourierBffServerFromEnv() {
+    return createCourierBffServer(createCourierCoreApiDependencies({
+        coreApiBaseUrl: process.env.CORE_API_BASE_URL ?? "http://127.0.0.1:3000",
+    }));
 }
 //# sourceMappingURL=server.js.map

@@ -1,6 +1,24 @@
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import { createAppSession } from "@fleetfeast/shared-contracts";
+export function createConsumerCoreApiDependencies(options) {
+    const baseUrl = options.coreApiBaseUrl.replace(/\/+$/, "");
+    const fetchImpl = options.fetchImpl ?? fetch;
+    return {
+        async getOrderById(orderId) {
+            const response = await fetchImpl(`${baseUrl}/api/v1/consumer/orders/${encodeURIComponent(orderId)}`);
+            if (!response.ok) {
+                throw new Error("CORE_API_CONSUMER_ORDER_FETCH_FAILED");
+            }
+            const payload = (await response.json());
+            return {
+                id: payload.id,
+                status: payload.status,
+                timelineVersion: typeof payload.timelineVersion === "number" ? payload.timelineVersion : 0,
+            };
+        },
+    };
+}
 export function createConsumerBffServer(dependencies) {
     const app = Fastify();
     app.post("/app/v1/consumer/session/exchange", async (request, reply) => {
@@ -41,5 +59,10 @@ export function createConsumerBffServer(dependencies) {
         return { order };
     });
     return app;
+}
+export function createConsumerBffServerFromEnv() {
+    return createConsumerBffServer(createConsumerCoreApiDependencies({
+        coreApiBaseUrl: process.env.CORE_API_BASE_URL ?? "http://127.0.0.1:3000",
+    }));
 }
 //# sourceMappingURL=server.js.map

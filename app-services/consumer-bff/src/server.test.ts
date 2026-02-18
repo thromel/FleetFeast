@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { createServer as createHttpServer } from "node:http";
 import test from "node:test";
 
-import { createConsumerBffServer } from "./server.js";
+import { createConsumerBffServer, createConsumerCoreApiDependencies } from "./server.js";
 
 test("consumer-bff exchanges OIDC token into app session", async () => {
   const app = createConsumerBffServer({
@@ -71,5 +72,87 @@ test("consumer-bff serves consumer order details through adapter", async () => {
     assert.equal(payload.order.status, "COURIER_ASSIGNED");
   } finally {
     await app.close();
+  }
+});
+
+test("consumer-bff core-api dependency calls backend order endpoint", async () => {
+  const requests: Array<{ method: string; url: string }> = [];
+  const backend = createHttpServer((request, response) => {
+    requests.push({
+      method: request.method ?? "",
+      url: request.url ?? "",
+    });
+
+    if (request.method === "GET" && request.url === "/api/v1/consumer/orders/order-77") {
+      response.statusCode = 200;
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          id: "order-77",
+          status: "COURIER_ASSIGNED",
+          timelineVersion: 9,
+        }),
+      );
+      return;
+    }
+
+    response.statusCode = 404;
+    response.end();
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    backend.listen(0, "127.0.0.1", (error?: Error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+
+  const backendAddress = backend.address();
+  if (!backendAddress || typeof backendAddress === "string") {
+    throw new Error("Failed to bind consumer backend stub");
+  }
+
+  const app = createConsumerBffServer(
+    createConsumerCoreApiDependencies({
+      coreApiBaseUrl: `http://127.0.0.1:${backendAddress.port}`,
+    }),
+  );
+  await app.listen({ port: 0, host: "127.0.0.1" });
+
+  try {
+    const address = app.server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind consumer-bff listener");
+    }
+
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/app/v1/consumer/orders/order-77`,
+    );
+    assert.equal(response.status, 200);
+
+    const payload = (await response.json()) as {
+      order: { id: string; status: string; timelineVersion: number };
+    };
+    assert.equal(payload.order.id, "order-77");
+    assert.equal(payload.order.status, "COURIER_ASSIGNED");
+    assert.equal(payload.order.timelineVersion, 9);
+    assert.equal(requests[0]?.method, "GET");
+    assert.equal(requests[0]?.url, "/api/v1/consumer/orders/order-77");
+  } finally {
+    await app.close();
+    await new Promise<void>((resolve, reject) => {
+      backend.close((error?: Error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
   }
 });
