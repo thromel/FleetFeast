@@ -219,3 +219,40 @@ test("internal settlement reconciliation results route includes summary counters
     listener.close();
   }
 });
+
+test("internal settlement reconciliation ingest route parses csv and runs reconciliation", async () => {
+  const app = createServer();
+  const listener = app.listen(0);
+
+  try {
+    const address = listener.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind test listener");
+    }
+
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const response = await fetch(`${baseUrl}/internal/settlement/reconciliation/ingest`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        expectedRecords: [
+          { entityId: "merchant-1", amount: 5000 },
+          { entityId: "courier-1", amount: 1200 },
+        ],
+        actualRecordsCsv: "entityId,amount\nmerchant-1,4975\ncourier-1,1200\n",
+        toleranceCents: 20,
+      }),
+    });
+
+    assert.equal(response.status, 200);
+    const payload = (await response.json()) as {
+      ingestedRecords: number;
+      exceptionCases: Array<{ entityId: string }>;
+    };
+    assert.equal(payload.ingestedRecords, 2);
+    assert.equal(payload.exceptionCases.length, 1);
+    assert.equal(payload.exceptionCases[0]?.entityId, "merchant-1");
+  } finally {
+    listener.close();
+  }
+});

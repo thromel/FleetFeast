@@ -1151,6 +1151,73 @@ function validateSettlementReconciliationPayload(
   };
 }
 
+function validateSettlementReconciliationIngestPayload(
+  payload: Record<string, unknown>,
+): ReconcileSettlementInput & { ingestedRecords: number } {
+  const expectedRecords = payload.expectedRecords;
+  const actualRecordsCsv = payload.actualRecordsCsv;
+  const toleranceCents = payload.toleranceCents;
+
+  if (
+    !Array.isArray(expectedRecords) ||
+    typeof actualRecordsCsv !== "string" ||
+    actualRecordsCsv.trim().length === 0 ||
+    typeof toleranceCents !== "number" ||
+    toleranceCents < 0 ||
+    !Number.isFinite(toleranceCents)
+  ) {
+    throw new Error("INVALID_SETTLEMENT_RECONCILIATION_INGEST_PAYLOAD");
+  }
+
+  const actualRecords = parseSettlementReconciliationCsv(actualRecordsCsv);
+  const input = validateSettlementReconciliationPayload({
+    expectedRecords,
+    actualRecords,
+    toleranceCents,
+  });
+
+  return {
+    ...input,
+    ingestedRecords: actualRecords.length,
+  };
+}
+
+function parseSettlementReconciliationCsv(
+  csvPayload: string,
+): ReconcileSettlementInput["actualRecords"] {
+  const lines = csvPayload
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  if (lines.length === 0) {
+    throw new Error("INVALID_SETTLEMENT_RECONCILIATION_INGEST_PAYLOAD");
+  }
+
+  const header = lines[0];
+  if (header !== "entityId,amount") {
+    throw new Error("INVALID_SETTLEMENT_RECONCILIATION_INGEST_PAYLOAD");
+  }
+
+  return lines.slice(1).map((line) => {
+    const fields = line.split(",");
+    if (fields.length !== 2) {
+      throw new Error("INVALID_SETTLEMENT_RECONCILIATION_INGEST_PAYLOAD");
+    }
+
+    const entityId = fields[0]?.trim() ?? "";
+    const amount = Number(fields[1]?.trim());
+    if (entityId.length === 0 || !Number.isFinite(amount) || amount < 0) {
+      throw new Error("INVALID_SETTLEMENT_RECONCILIATION_INGEST_PAYLOAD");
+    }
+
+    return {
+      entityId,
+      amount,
+    };
+  });
+}
+
 function validateSettlementReconciliationQuery(searchParams: URLSearchParams): {
   limit?: number;
   hasExceptions?: boolean;
@@ -2462,6 +2529,17 @@ export function createServer(options: CreateServerOptions = {}) {
         return;
       }
 
+      if (request.method === "POST" && pathname === "/internal/settlement/reconciliation/ingest") {
+        const payload = await parseJsonBody(request);
+        const input = validateSettlementReconciliationIngestPayload(payload);
+        const result = await settlementReconciliationService.reconcile(input);
+        sendJson(response, 200, {
+          ...result,
+          ingestedRecords: input.ingestedRecords,
+        });
+        return;
+      }
+
       if (request.method === "GET" && pathname === "/internal/settlement/reconciliation/results") {
         const query = validateSettlementReconciliationQuery(requestUrl.searchParams);
         const results = await settlementReconciliationService.listResults(query);
@@ -3028,6 +3106,7 @@ export function createServer(options: CreateServerOptions = {}) {
             "INVALID_REFUND_APPROVAL_PAYLOAD",
             "INVALID_SETTLEMENT_JOURNAL_PAYLOAD",
             "INVALID_SETTLEMENT_RECONCILIATION_PAYLOAD",
+            "INVALID_SETTLEMENT_RECONCILIATION_INGEST_PAYLOAD",
             "INVALID_SETTLEMENT_RECONCILIATION_QUERY",
             "INVALID_PAYOUT_BATCH_PAYLOAD",
             "INVALID_PAYOUT_SCHEDULE_RUN_PAYLOAD",
