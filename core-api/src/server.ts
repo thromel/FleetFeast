@@ -2465,7 +2465,10 @@ export function createServer(options: CreateServerOptions = {}) {
       if (request.method === "GET" && pathname === "/internal/settlement/reconciliation/results") {
         const query = validateSettlementReconciliationQuery(requestUrl.searchParams);
         const results = await settlementReconciliationService.listResults(query);
-        sendJson(response, 200, { results });
+        const summary = await settlementReconciliationService.summarizeResults({
+          hasExceptions: query.hasExceptions,
+        });
+        sendJson(response, 200, { results, summary });
         return;
       }
 

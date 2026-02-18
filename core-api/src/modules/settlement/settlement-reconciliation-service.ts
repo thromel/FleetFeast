@@ -76,20 +76,29 @@ export class SettlementReconciliationService {
     hasExceptions?: boolean;
   }): Promise<SettlementReconciliationResult[]> {
     const history = await this.repository.list();
-    const filtered =
-      input?.hasExceptions === undefined
-        ? history
-        : history.filter((result) =>
-            input.hasExceptions
-              ? result.exceptionCases.length > 0
-              : result.exceptionCases.length === 0,
-          );
+    const filtered = this.filterByExceptionState(history, input?.hasExceptions);
 
     if (input?.limit === undefined) {
       return filtered;
     }
 
     return filtered.slice(0, input.limit);
+  }
+
+  async summarizeResults(input?: { hasExceptions?: boolean }): Promise<{
+    totalRuns: number;
+    runsWithExceptions: number;
+    runsWithoutExceptions: number;
+  }> {
+    const history = await this.repository.list();
+    const filtered = this.filterByExceptionState(history, input?.hasExceptions);
+    const runsWithExceptions = filtered.filter((result) => result.exceptionCases.length > 0).length;
+
+    return {
+      totalRuns: filtered.length,
+      runsWithExceptions,
+      runsWithoutExceptions: filtered.length - runsWithExceptions,
+    };
   }
 
   private sumAmounts(records: Map<string, number>): number {
@@ -109,5 +118,18 @@ export class SettlementReconciliationService {
     }
 
     return "AMOUNT_MISMATCH";
+  }
+
+  private filterByExceptionState(
+    history: SettlementReconciliationResult[],
+    hasExceptions?: boolean,
+  ): SettlementReconciliationResult[] {
+    if (hasExceptions === undefined) {
+      return history;
+    }
+
+    return history.filter((result) =>
+      hasExceptions ? result.exceptionCases.length > 0 : result.exceptionCases.length === 0,
+    );
   }
 }

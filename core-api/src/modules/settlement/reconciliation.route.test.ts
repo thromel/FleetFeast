@@ -165,3 +165,57 @@ test("internal settlement reconciliation results route filters by exception pres
     listener.close();
   }
 });
+
+test("internal settlement reconciliation results route includes summary counters", async () => {
+  const app = createServer();
+  const listener = app.listen(0);
+
+  try {
+    const address = listener.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind test listener");
+    }
+
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const withException = await fetch(`${baseUrl}/internal/settlement/reconciliation/run`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        expectedRecords: [{ entityId: "merchant-1", amount: 5000 }],
+        actualRecords: [{ entityId: "merchant-1", amount: 4800 }],
+        toleranceCents: 20,
+      }),
+    });
+    assert.equal(withException.status, 200);
+
+    const withoutException = await fetch(`${baseUrl}/internal/settlement/reconciliation/run`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        expectedRecords: [{ entityId: "merchant-1", amount: 5000 }],
+        actualRecords: [{ entityId: "merchant-1", amount: 5000 }],
+        toleranceCents: 20,
+      }),
+    });
+    assert.equal(withoutException.status, 200);
+
+    const list = await fetch(`${baseUrl}/internal/settlement/reconciliation/results?limit=2`, {
+      method: "GET",
+    });
+    assert.equal(list.status, 200);
+
+    const payload = (await list.json()) as {
+      summary?: {
+        totalRuns: number;
+        runsWithExceptions: number;
+        runsWithoutExceptions: number;
+      };
+    };
+    assert.ok(payload.summary);
+    assert.equal(payload.summary?.totalRuns, 2);
+    assert.equal(payload.summary?.runsWithExceptions, 1);
+    assert.equal(payload.summary?.runsWithoutExceptions, 1);
+  } finally {
+    listener.close();
+  }
+});

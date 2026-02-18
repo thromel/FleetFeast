@@ -33,4 +33,9 @@ test("reconciliation flags mismatches above tolerance", async () => {
   const history = await reconciliationService.listResults({ limit: 1 });
   assert.equal(history.length, 1);
   assert.equal(history[0]?.reconciliationId, result.reconciliationId);
+
+  const summary = await reconciliationService.summarizeResults();
+  assert.equal(summary.totalRuns, 1);
+  assert.equal(summary.runsWithExceptions, 1);
+  assert.equal(summary.runsWithoutExceptions, 0);
 });
