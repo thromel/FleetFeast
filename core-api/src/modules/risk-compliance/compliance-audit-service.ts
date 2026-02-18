@@ -25,7 +25,7 @@ export class ComplianceAuditService {
   ) {}
 
   async appendEvent(input: AppendComplianceAuditEventInput): Promise<ComplianceAuditEvent> {
-    const previousHash = this.repository.latest()?.hash ?? "GENESIS";
+    const previousHash = (await this.repository.latest())?.hash ?? "GENESIS";
     const timestamp = new Date().toISOString();
     const auditEventId = randomUUID();
     const hash = this.computeHash({
@@ -85,14 +85,14 @@ export class ComplianceAuditService {
     return event;
   }
 
-  listEvents(): ComplianceAuditEvent[] {
+  async listEvents(): Promise<ComplianceAuditEvent[]> {
     return this.repository.list();
   }
 
   async generateEvidenceReport(
     input: GenerateComplianceEvidenceInput,
   ): Promise<ComplianceEvidenceReport> {
-    const events = this.repository.list();
+    const events = await this.repository.list();
     const countByActionType: Record<string, number> = {};
 
     for (const event of events) {

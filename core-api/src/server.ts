@@ -27,6 +27,7 @@ import { PersistentSettlementLedgerRepository } from "./platform/persistence/rep
 import { PersistentManualReviewRepository } from "./platform/persistence/repositories/persistent-manual-review-repository.js";
 import { PersistentSupportTicketRepository } from "./platform/persistence/repositories/persistent-support-ticket-repository.js";
 import { PersistentSupportEscalationRepository } from "./platform/persistence/repositories/persistent-support-escalation-repository.js";
+import { PersistentComplianceAuditRepository } from "./platform/persistence/repositories/persistent-compliance-audit-repository.js";
 
 import { AuthError, AuthService } from "./modules/identity/auth-service.js";
 import {
@@ -1784,7 +1785,9 @@ export function createServer(options: CreateServerOptions = {}) {
     eventBus,
   );
   const complianceAuditService = new ComplianceAuditService(
-    new InMemoryComplianceAuditRepository(),
+    persistenceEnabled
+      ? new PersistentComplianceAuditRepository(documentStore!)
+      : new InMemoryComplianceAuditRepository(),
     eventBus,
   );
   const settlementLedgerService = new SettlementLedgerService(
@@ -2233,7 +2236,7 @@ export function createServer(options: CreateServerOptions = {}) {
       }
 
       if (request.method === "GET" && pathname === "/internal/risk/compliance/audit/events") {
-        const events = complianceAuditService.listEvents();
+        const events = await complianceAuditService.listEvents();
         sendJson(response, 200, { events });
         return;
       }

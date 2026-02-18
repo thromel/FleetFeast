@@ -7,14 +7,14 @@ export class InMemoryComplianceAuditRepository {
     this.events.push({ ...event, metadata: { ...event.metadata } });
   }
 
-  list(): ComplianceAuditEvent[] {
+  async list(): Promise<ComplianceAuditEvent[]> {
     return this.events.map((event) => ({
       ...event,
       metadata: { ...event.metadata },
     }));
   }
 
-  latest(): ComplianceAuditEvent | null {
+  async latest(): Promise<ComplianceAuditEvent | null> {
     if (this.events.length === 0) {
       return null;
     }
