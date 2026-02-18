@@ -470,6 +470,7 @@ Last updated: `2026-02-18`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
+| `1d039fd` | A07 | Added realtime-gateway push fallback registration and dispatch baseline with websocket-vs-push behavior tests |
 | `3bead32` | A06 | Added shared `app-auth` package and hardened BFF session exchange/refresh flows with replay and device-binding tests |
 | `0a955fa` | A05 | Added runnable Next.js merchant/admin apps with typed API clients and tests |
 | `7cb1032` | A02 | Added persona BFF server implementations and realtime gateway baseline with green tests |
