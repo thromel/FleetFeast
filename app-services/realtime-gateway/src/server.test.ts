@@ -20,7 +20,7 @@ test("realtime gateway accepts websocket connections and publishes channel event
     );
 
     const messagePromise = new Promise<string>((resolve, reject) => {
-      ws.once("message", (data) => resolve(String(data)));
+      ws.once("message", (data: import("ws").RawData) => resolve(String(data)));
       ws.once("error", reject);
     });
 

@@ -47,7 +47,7 @@ test("consumer-bff exchanges OIDC token into app session", async () => {
 
 test("consumer-bff serves consumer order details through adapter", async () => {
   const app = createConsumerBffServer({
-    getOrderById: async (orderId) => ({
+    getOrderById: async (orderId: string) => ({
       id: orderId,
       status: "COURIER_ASSIGNED",
       timelineVersion: 3,
