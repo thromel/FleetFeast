@@ -401,3 +401,48 @@ Backlog is accepted when:
 - sprint wave plan has measurable exit criteria,
 - release-quality, security, DR, and cost validation stories are included,
 - team can start Sprint 1 without additional architecture decisions.
+
+## 11. Backend Implementation Progress (Live Tracker)
+
+Last updated: `2026-02-18`
+
+### 11.1 Epic Status Snapshot (Backend Features)
+
+| Epic | Backend Status | Notes |
+|---|---|---|
+| E02 Identity/AuthZ | Done | Registration, sessions, RBAC, MFA, break-glass implemented and tested |
+| E03 Merchant Catalog | Done | Menu versioning, availability, store status, prep-time endpoints implemented |
+| E04 Consumer Ordering | Done | Basket, zones, quotes, checkout, consumer order endpoints implemented |
+| E05 Order Orchestration | Done | State machine, cancellation matrix, dispatch request flow, timeline + rebuild implemented |
+| E06 Dispatch | Mostly done | Go dispatch scoring/assign/reassign/telemetry implemented; direct core->dispatch gRPC orchestration remains for full parity |
+| E07 Payments | Done | Auth/capture/COD/refunds/audit flows implemented |
+| E08 Settlement/Payouts | In progress | Ledger, payout batches/schedules/statements done; reconciliation run/history implemented; processor-file ingest job still pending |
+| E09 Notifications | Done | Fanout, templates/locale, retry+DLQ, receipts implemented |
+| E10 Support/Risk/Compliance | Done | Tickets, interventions, SLA escalation, policy engine, manual reviews, compliance audit implemented |
+| E11 Observability/SRE | Partial | Tracing/logging and SLO APIs implemented; persistent log store and deeper DR/security hardening pending |
+
+### 11.2 Recent Backend Delivery Log
+
+| Commit | Story Mapping | Outcome |
+|---|---|---|
+| `8f96f84` | E08-S03 | Added reconciliation history filter by exception state |
+| `578dbd4` | E08-S03 | Persisted reconciliation runs and added results API |
+| `61147b2` | E05-S05 | Hydrated durable outbox for timeline rebuild reliability |
+| `b154e83` | E08-S03 | Exposed reconciliation run API |
+| `8657d13` | E10-S04 | Made risk policy rules configurable and persistent |
+| `4610780` | E05-S05 | Persisted order timeline projection across restarts |
+| `a4e3f92` | E09-S01 / E09-S04 | Persisted notification fanout and receipts |
+| `e6f4895` | E08-S04 | Persisted payout statements across restarts |
+| `528d3af` | E10-S06 | Persisted compliance audit logs across restarts |
+| `6373946` | E10-S03 | Persisted support SLA escalation state |
+| `323203a` | E10-S01 | Persisted support tickets across restarts |
+| `db03dcf` | E10-S05 | Persisted manual review workflow state |
+| `633529b` | E08-S02 | Persisted payout schedule idempotency state |
+| `78b0c74` | E07-* | Persisted payment intents/refunds/audit artifacts |
+| `51e4e68` | Cross-cutting | Added pluggable persistent stores and broker adapters |
+
+### 11.3 Next Backend Features Queue
+
+1. Complete `E11-S01` persistence gap by adding durable observability log repository in persistence mode.
+2. Close remaining `E06/E05` integration gap with direct core orchestration path to dispatch gRPC contracts.
+3. Complete `E08-S03` processor settlement-file ingest/reconciliation path (beyond manual payload run endpoint).
