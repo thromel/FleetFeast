@@ -1,0 +1,14 @@
+:root {
+  --ff-color-bg: #f7f3ea;
+  --ff-color-surface: #fffaf1;
+  --ff-color-text: #1f2a24;
+  --ff-color-brand: #e95f2b;
+  --ff-color-accent: #2f6f4f;
+
+  --ff-radius-sm: 8px;
+  --ff-radius-md: 14px;
+  --ff-radius-lg: 24px;
+
+  --ff-font-display: "Fraunces", serif;
+  --ff-font-body: "Manrope", sans-serif;
+}

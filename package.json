@@ -1,0 +1,17 @@
+{
+  "name": "fleetfeast-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*",
+    "app-services/*",
+    "apps/web-*"
+  ],
+  "scripts": {
+    "build:app-layer": "npm run build --workspaces --if-present",
+    "test:app-layer": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
