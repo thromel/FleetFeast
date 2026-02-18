@@ -470,7 +470,7 @@ Last updated: `2026-02-18`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
-| `uncommitted` | A07 | Added provider-specific APNs/FCM push adapters and `/app/v1/realtime/publish` fanout endpoint with API-key option |
+| `9fd80bb` | A07 | Added provider-specific APNs/FCM push adapters and `/app/v1/realtime/publish` fanout endpoint with API-key option |
 | `1d039fd` | A07 | Added realtime-gateway push fallback registration and dispatch baseline with websocket-vs-push behavior tests |
 | `3bead32` | A06 | Added shared `app-auth` package and hardened BFF session exchange/refresh flows with replay and device-binding tests |
 | `0a955fa` | A05 | Added runnable Next.js merchant/admin apps with typed API clients and tests |
