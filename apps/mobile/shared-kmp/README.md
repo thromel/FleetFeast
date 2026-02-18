@@ -7,14 +7,16 @@ Current scope:
 1. shared app-layer contract models (`AppSession*`, feature flags, geo contract)
 2. offline action queue semantics with idempotency + retry transitions
 3. typed BFF/realtime client adapters over an abstract transport (`BffTransport`)
-4. JVM-testable baseline for iterative expansion into full iOS/Android clients
+4. queue persistence abstraction (`OfflineActionStore`) with restart rehydration semantics
+5. JVM-testable baseline for iterative expansion into full iOS/Android clients
 
 ## Run Tests (Docker)
 
 ```bash
 docker run --rm \
+  --user 0:0 \
   -v "$PWD":/workspace \
   -w /workspace/apps/mobile/shared-kmp \
   gradle:8.10-jdk17 \
-  gradle test --no-daemon
+  gradle -Dorg.gradle.project.buildDir=/tmp/fleetfeast-kmp-build jvmTest --no-daemon
 ```

@@ -10,7 +10,7 @@
   "scripts": {
     "build:app-layer": "npm run build --workspaces --if-present",
     "test:app-layer": "npm run test --workspaces --if-present",
-    "test:mobile-shared-kmp": "docker run --rm -v \"$PWD\":/workspace -w /workspace/apps/mobile/shared-kmp gradle:8.10-jdk17 gradle jvmTest --no-daemon",
+    "test:mobile-shared-kmp": "docker run --rm --user 0:0 -v \"$PWD\":/workspace -w /workspace/apps/mobile/shared-kmp gradle:8.10-jdk17 gradle -Dorg.gradle.project.buildDir=/tmp/fleetfeast-kmp-build jvmTest --no-daemon",
     "dev:web-stack": "node scripts/dev-web-stack.mjs"
   },
   "devDependencies": {
