@@ -36,6 +36,7 @@ import { PersistentDeliveryZoneRepository } from "./platform/persistence/reposit
 import { PersistentOrderTimelineRepository } from "./platform/persistence/repositories/persistent-order-timeline-repository.js";
 import { PersistentRiskPolicyRepository } from "./platform/persistence/repositories/persistent-risk-policy-repository.js";
 import { PersistentSettlementReconciliationRepository } from "./platform/persistence/repositories/persistent-settlement-reconciliation-repository.js";
+import { PersistentStructuredLogRepository } from "./platform/persistence/repositories/persistent-structured-log-repository.js";
 
 import { AuthError, AuthService } from "./modules/identity/auth-service.js";
 import {
@@ -1789,10 +1790,10 @@ export function createServer(options: CreateServerOptions = {}) {
   const repository = persistenceEnabled
     ? new PersistentIdentityRepository(documentStore!)
     : new InMemoryIdentityRepository();
-  const observabilityService = new ObservabilityService(
-    new InMemoryStructuredLogRepository(),
-    eventBus,
-  );
+  const observabilityLogRepository = persistenceEnabled
+    ? new PersistentStructuredLogRepository(documentStore!)
+    : new InMemoryStructuredLogRepository();
+  const observabilityService = new ObservabilityService(observabilityLogRepository, eventBus);
   const sloService = new SLOService(eventBus);
   const identityService = new IdentityService(repository, eventBus);
   const sessionStore = persistenceEnabled
@@ -2071,6 +2072,7 @@ export function createServer(options: CreateServerOptions = {}) {
       );
 
       if (request.method === "GET" && pathname === "/internal/observability/logs") {
+        await observabilityService.flush();
         const traceId = requestUrl.searchParams.get("traceId") ?? undefined;
         const logs = observabilityService.listLogs(traceId);
         sendJson(response, 200, { logs });
@@ -2078,6 +2080,7 @@ export function createServer(options: CreateServerOptions = {}) {
       }
 
       if (request.method === "GET" && pathname === "/internal/observability/slo/dashboard") {
+        await observabilityService.flush();
         const logs = observabilityService.listLogs();
         const report = await sloService.evaluate(logs);
         sendJson(response, 200, report);

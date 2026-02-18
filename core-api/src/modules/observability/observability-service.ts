@@ -62,4 +62,8 @@ export class ObservabilityService {
   listLogs(traceId?: string): StructuredLogEntry[] {
     return this.repository.list(traceId);
   }
+
+  async flush(): Promise<void> {
+    await this.repository.flush();
+  }
 }

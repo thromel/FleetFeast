@@ -18,4 +18,8 @@ export class InMemoryStructuredLogRepository {
         metadata: { ...log.metadata },
       }));
   }
+
+  async flush(): Promise<void> {
+    // No-op for purely in-memory mode.
+  }
 }
