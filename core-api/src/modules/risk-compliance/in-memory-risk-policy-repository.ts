@@ -9,8 +9,21 @@ export class InMemoryRiskPolicyRepository {
     }
   }
 
-  findRule(actionType: string): RiskPolicyRule | null {
-    return this.rules.get(actionType) ?? null;
+  async findRule(actionType: string): Promise<RiskPolicyRule | null> {
+    const rule = this.rules.get(actionType);
+    return rule ? { ...rule } : null;
+  }
+
+  async upsertRule(rule: RiskPolicyRule): Promise<RiskPolicyRule> {
+    const nextRule: RiskPolicyRule = { ...rule };
+    this.rules.set(nextRule.actionType, nextRule);
+    return { ...nextRule };
+  }
+
+  async listRules(): Promise<RiskPolicyRule[]> {
+    return [...this.rules.values()]
+      .map((rule) => ({ ...rule }))
+      .sort((left, right) => left.actionType.localeCompare(right.actionType));
   }
 }
 

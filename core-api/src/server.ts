@@ -34,6 +34,7 @@ import { PersistentNotificationRetryRepository } from "./platform/persistence/re
 import { PersistentNotificationReceiptRepository } from "./platform/persistence/repositories/persistent-notification-receipt-repository.js";
 import { PersistentDeliveryZoneRepository } from "./platform/persistence/repositories/persistent-delivery-zone-repository.js";
 import { PersistentOrderTimelineRepository } from "./platform/persistence/repositories/persistent-order-timeline-repository.js";
+import { PersistentRiskPolicyRepository } from "./platform/persistence/repositories/persistent-risk-policy-repository.js";
 
 import { AuthError, AuthService } from "./modules/identity/auth-service.js";
 import {
@@ -140,7 +141,10 @@ import {
   ManualReviewNotFoundError,
   ManualReviewService,
 } from "./modules/risk-compliance/manual-review-service.js";
-import { RiskPolicyService } from "./modules/risk-compliance/risk-policy-service.js";
+import {
+  InvalidRiskPolicyRuleError,
+  RiskPolicyService,
+} from "./modules/risk-compliance/risk-policy-service.js";
 import {
   SettlementLedgerService,
   UnbalancedJournalError,
@@ -173,6 +177,7 @@ import type {
   GenerateComplianceEvidenceInput,
   QueueManualReviewInput,
   ResolveManualReviewInput,
+  UpsertRiskPolicyRuleInput,
 } from "./modules/risk-compliance/types.js";
 import type {
   HandleNotificationFailureInput,
@@ -1500,6 +1505,33 @@ function validateRiskPolicyEvaluatePayload(
   };
 }
 
+function validateRiskPolicyRulePayload(
+  actionType: string,
+  payload: Record<string, unknown>,
+): UpsertRiskPolicyRuleInput {
+  const allowUpToCents = payload.allowUpToCents;
+  const reviewUpToCents = payload.reviewUpToCents;
+
+  if (
+    typeof actionType !== "string" ||
+    actionType.trim().length === 0 ||
+    typeof allowUpToCents !== "number" ||
+    !Number.isFinite(allowUpToCents) ||
+    allowUpToCents < 0 ||
+    typeof reviewUpToCents !== "number" ||
+    !Number.isFinite(reviewUpToCents) ||
+    reviewUpToCents < 0
+  ) {
+    throw new Error("INVALID_RISK_POLICY_RULE_PAYLOAD");
+  }
+
+  return {
+    actionType,
+    allowUpToCents,
+    reviewUpToCents,
+  };
+}
+
 function validateQueueManualReviewPayload(
   payload: Record<string, unknown>,
 ): QueueManualReviewInput {
@@ -1785,7 +1817,12 @@ export function createServer(options: CreateServerOptions = {}) {
     supportEscalationRepository,
     eventBus,
   );
-  const riskPolicyService = new RiskPolicyService(new InMemoryRiskPolicyRepository(), eventBus);
+  const riskPolicyService = new RiskPolicyService(
+    persistenceEnabled
+      ? new PersistentRiskPolicyRepository(documentStore!)
+      : new InMemoryRiskPolicyRepository(),
+    eventBus,
+  );
   const manualReviewService = new ManualReviewService(
     persistenceEnabled
       ? new PersistentManualReviewRepository(documentStore!)
@@ -1934,6 +1971,9 @@ export function createServer(options: CreateServerOptions = {}) {
       );
       const manualReviewResolveRouteMatch = pathname.match(
         /^\/api\/v1\/admin\/risk\/reviews\/([^/]+)\/resolve$/,
+      );
+      const riskPolicyRuleRouteMatch = pathname.match(
+        /^\/internal\/risk\/policy\/rules\/([^/]+)$/,
       );
 
       if (request.method === "GET" && pathname === "/internal/observability/logs") {
@@ -2225,6 +2265,21 @@ export function createServer(options: CreateServerOptions = {}) {
         const input = validateRiskPolicyEvaluatePayload(payload);
         const decision = await riskPolicyService.evaluate(input);
         sendJson(response, 200, decision);
+        return;
+      }
+
+      if (request.method === "GET" && pathname === "/internal/risk/policy/rules") {
+        const rules = await riskPolicyService.listRules();
+        sendJson(response, 200, { rules });
+        return;
+      }
+
+      if (request.method === "PUT" && riskPolicyRuleRouteMatch) {
+        const payload = await parseJsonBody(request);
+        const actionType = decodeURIComponent(riskPolicyRuleRouteMatch[1] ?? "");
+        const input = validateRiskPolicyRulePayload(actionType, payload);
+        const rule = await riskPolicyService.upsertRule(input);
+        sendJson(response, 200, rule);
         return;
       }
 
@@ -2708,6 +2763,14 @@ export function createServer(options: CreateServerOptions = {}) {
         return;
       }
 
+      if (error instanceof InvalidRiskPolicyRuleError) {
+        sendJson(response, 400, {
+          errorCode: error.code,
+          message: error.message,
+        });
+        return;
+      }
+
       if (error instanceof PaymentOrderNotFoundError) {
         sendJson(response, 404, {
           errorCode: error.code,
@@ -2833,6 +2896,7 @@ export function createServer(options: CreateServerOptions = {}) {
             "INVALID_SUPPORT_INTERVENTION_PAYLOAD",
             "INVALID_SUPPORT_SLA_PAYLOAD",
             "INVALID_RISK_POLICY_EVALUATE_PAYLOAD",
+            "INVALID_RISK_POLICY_RULE_PAYLOAD",
             "INVALID_MANUAL_REVIEW_QUEUE_PAYLOAD",
             "INVALID_MANUAL_REVIEW_RESOLVE_PAYLOAD",
             "INVALID_COMPLIANCE_AUDIT_PAYLOAD",

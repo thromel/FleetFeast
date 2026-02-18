@@ -75,3 +75,68 @@ test("queued manual review survives core-api restart when persistence is enabled
     listenerB.close();
   }
 });
+
+test("risk policy rule overrides survive core-api restart when persistence is enabled", async () => {
+  const documentStore = new InMemoryDocumentStore();
+
+  const appA = createServer({
+    enablePersistence: true,
+    documentStore,
+  });
+  const listenerA = appA.listen(0);
+
+  try {
+    const address = listenerA.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind test listener");
+    }
+
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const updateRule = await fetch(
+      `${baseUrl}/internal/risk/policy/rules/REFUND_APPROVAL`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          allowUpToCents: 3500,
+          reviewUpToCents: 8000,
+        }),
+      },
+    );
+
+    assert.equal(updateRule.status, 200);
+  } finally {
+    listenerA.close();
+  }
+
+  const appB = createServer({
+    enablePersistence: true,
+    documentStore,
+  });
+  const listenerB = appB.listen(0);
+
+  try {
+    const address = listenerB.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind test listener");
+    }
+
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const evaluate = await fetch(`${baseUrl}/internal/risk/policy/evaluate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        actionType: "REFUND_APPROVAL",
+        amountCents: 3000,
+        actorId: "support-persist-1",
+      }),
+    });
+
+    assert.equal(evaluate.status, 200);
+    const decision = (await evaluate.json()) as { decision: string; reasonCode: string };
+    assert.equal(decision.decision, "ALLOW");
+    assert.equal(decision.reasonCode, "RULE_ALLOW");
+  } finally {
+    listenerB.close();
+  }
+});

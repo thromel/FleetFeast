@@ -6,6 +6,12 @@ export interface EvaluateRiskPolicyInput {
   actorId: string;
 }
 
+export interface UpsertRiskPolicyRuleInput {
+  actionType: string;
+  allowUpToCents: number;
+  reviewUpToCents: number;
+}
+
 export interface RiskPolicyRule {
   actionType: string;
   allowUpToCents: number;

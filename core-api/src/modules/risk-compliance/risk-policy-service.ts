@@ -6,7 +6,18 @@ import type {
   EvaluateRiskPolicyInput,
   RiskPolicyDecision,
   RiskPolicyDecisionType,
+  RiskPolicyRule,
+  UpsertRiskPolicyRuleInput,
 } from "./types.js";
+
+export class InvalidRiskPolicyRuleError extends Error {
+  code = "RISK_POLICY_INVALID_RULE";
+
+  constructor(actionType: string) {
+    super(`Risk policy rule '${actionType}' has invalid thresholds.`);
+    this.name = "InvalidRiskPolicyRuleError";
+  }
+}
 
 export class RiskPolicyService {
   constructor(
@@ -15,7 +26,7 @@ export class RiskPolicyService {
   ) {}
 
   async evaluate(input: EvaluateRiskPolicyInput): Promise<RiskPolicyDecision> {
-    const rule = this.repository.findRule(input.actionType);
+    const rule = await this.repository.findRule(input.actionType);
     const evaluatedAt = new Date().toISOString();
 
     let decision: RiskPolicyDecisionType;
@@ -58,5 +69,34 @@ export class RiskPolicyService {
     });
 
     return policyDecision;
+  }
+
+  async upsertRule(input: UpsertRiskPolicyRuleInput): Promise<RiskPolicyRule> {
+    if (input.reviewUpToCents < input.allowUpToCents) {
+      throw new InvalidRiskPolicyRuleError(input.actionType);
+    }
+
+    const rule = await this.repository.upsertRule({
+      actionType: input.actionType,
+      allowUpToCents: input.allowUpToCents,
+      reviewUpToCents: input.reviewUpToCents,
+    });
+
+    const occurredAt = new Date().toISOString();
+    this.eventBus.publish({
+      type: "risk.policy_rule_upserted.v1",
+      occurredAt,
+      payload: {
+        actionType: rule.actionType,
+        allowUpToCents: rule.allowUpToCents,
+        reviewUpToCents: rule.reviewUpToCents,
+      },
+    });
+
+    return rule;
+  }
+
+  async listRules(): Promise<RiskPolicyRule[]> {
+    return this.repository.listRules();
   }
 }
