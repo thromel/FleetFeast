@@ -26,8 +26,9 @@ export class SupportSLAService {
     const evaluatedAt = new Date(input.evaluatedAt).toISOString();
     const escalations: SupportEscalationRecord[] = [];
 
-    for (const ticket of this.ticketRepository.listByStatus("OPEN")) {
-      if (this.escalationRepository.hasEscalationForTicket(ticket.ticketId)) {
+    const openTickets = await this.ticketRepository.listByStatus("OPEN");
+    for (const ticket of openTickets) {
+      if (await this.escalationRepository.hasEscalationForTicket(ticket.ticketId)) {
         continue;
       }
 

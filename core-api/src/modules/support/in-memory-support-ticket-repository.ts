@@ -11,7 +11,7 @@ export class InMemorySupportTicketRepository {
     return this.tickets.get(ticketId) ?? null;
   }
 
-  listByStatus(status: SupportTicket["status"]): SupportTicket[] {
+  async listByStatus(status: SupportTicket["status"]): Promise<SupportTicket[]> {
     return [...this.tickets.values()].filter((ticket) => ticket.status === status);
   }
 }

@@ -28,4 +28,11 @@ export class PersistentSupportTicketRepository extends InMemorySupportTicketRepo
     await super.save({ ...ticket });
     return { ...ticket };
   }
+
+  override async listByStatus(status: SupportTicket["status"]): Promise<SupportTicket[]> {
+    const tickets = await this.store.list<SupportTicket>(NAMESPACE);
+    return tickets
+      .filter((ticket) => ticket.status === status)
+      .map((ticket) => ({ ...ticket }));
+  }
 }

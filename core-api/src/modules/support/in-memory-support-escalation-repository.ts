@@ -9,11 +9,11 @@ export class InMemorySupportEscalationRepository {
     this.ticketEscalationIndex.add(escalation.ticketId);
   }
 
-  hasEscalationForTicket(ticketId: string): boolean {
+  async hasEscalationForTicket(ticketId: string): Promise<boolean> {
     return this.ticketEscalationIndex.has(ticketId);
   }
 
-  list(): SupportEscalationRecord[] {
+  async list(): Promise<SupportEscalationRecord[]> {
     return [...this.escalations.values()];
   }
 }
