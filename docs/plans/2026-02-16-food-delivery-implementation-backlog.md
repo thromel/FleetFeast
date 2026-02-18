@@ -470,7 +470,7 @@ Last updated: `2026-02-18`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
-| `uncommitted` | A05 | Added typed `shared-kmp` BFF/realtime clients over abstract transport with Kotlin tests for route/payload mapping |
+| `819efea` | A05 | Added typed `shared-kmp` BFF/realtime clients over abstract transport with Kotlin tests for route/payload mapping |
 | `4320cee` | A05 | Added KMP shared core scaffolding with offline queue tests and initial native iOS/Android shell directories |
 | `9fd80bb` | A07 | Added provider-specific APNs/FCM push adapters and `/app/v1/realtime/publish` fanout endpoint with API-key option |
 | `1d039fd` | A07 | Added realtime-gateway push fallback registration and dispatch baseline with websocket-vs-push behavior tests |
