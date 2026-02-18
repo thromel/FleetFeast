@@ -38,6 +38,9 @@ const processes = [
     CORE_API_BASE_URL: "http://127.0.0.1:3000",
     PORT: "4103"
   }),
+  startProcess("realtime-gateway", "npm", ["--workspace", "@fleetfeast/realtime-gateway", "run", "start"], {
+    PORT: "4104"
+  }),
   startProcess("web-merchant", "npm", ["--workspace", "@fleetfeast/web-merchant", "run", "dev"], {
     OPS_BFF_BASE_URL: "http://127.0.0.1:4103"
   }),

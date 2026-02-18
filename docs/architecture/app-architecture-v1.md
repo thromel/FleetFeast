@@ -19,7 +19,8 @@ Current implemented slice:
 2. persona BFFs (`consumer-bff`, `courier-bff`, `ops-bff`)
 3. `realtime-gateway` websocket baseline
 4. OIDC-backed app-session exchange with rotating refresh tokens in BFF layer
-5. push fallback registration and dispatch baseline in realtime gateway
+5. push fallback with provider-specific APNs/FCM adapters in realtime gateway
+6. internal realtime publish endpoint for channel fanout (`/app/v1/realtime/publish`)
 
 ## 2. Topology
 
@@ -38,6 +39,8 @@ Current implemented slice:
 5. `app-services/realtime-gateway` exposes push registration routes:
    - `POST /app/v1/realtime/push/register`
    - `POST /app/v1/realtime/push/unregister`
+6. `app-services/realtime-gateway` exposes internal fanout publish route:
+   - `POST /app/v1/realtime/publish`
 
 ### Core Platform Layer
 
@@ -50,6 +53,7 @@ Current implemented slice:
 2. BFF adapters call `core-api` typed contracts.
 3. No app client calls `core-api` directly.
 4. Realtime gateway receives domain-aligned events and publishes to channel subscribers.
+5. When no websocket subscriber exists for a channel, realtime gateway sends push fallback via provider adapters.
 
 Current concrete adapter mappings:
 
@@ -73,11 +77,14 @@ BFF and web services are environment-driven:
 2. `OPS_BFF_BASE_URL` for web apps (default `http://127.0.0.1:4103`)
 3. `APP_SESSION_JWT_SECRET` for BFF-issued app session JWT signing
 4. `OIDC_JWKS_URI`, `OIDC_ISSUER`, `OIDC_AUDIENCE` for provider-backed OIDC token verification (`dev:*` verifier fallback when unset)
-5. fixed local ports in current dev stack:
+5. `APNS_PUSH_ENDPOINT`, `APNS_PUSH_AUTH_TOKEN`, `FCM_PUSH_ENDPOINT`, `FCM_PUSH_AUTH_TOKEN` for push fallback provider adapters
+6. `REALTIME_PUBLISH_API_KEY` optional shared key for `/app/v1/realtime/publish`
+7. fixed local ports in current dev stack:
    - `core-api`: `3000`
    - `consumer-bff`: `4101`
    - `courier-bff`: `4102`
    - `ops-bff`: `4103`
+   - `realtime-gateway`: `4104`
    - `web-merchant`: `3001`
    - `web-admin`: `3002`
 
@@ -95,14 +102,16 @@ What it starts:
 2. `consumer-bff`
 3. `courier-bff`
 4. `ops-bff`
-5. merchant web app
-6. admin web app
+5. `realtime-gateway`
+6. merchant web app
+7. admin web app
 
 Smoke endpoints:
 
 1. `http://127.0.0.1:3001` (merchant web)
 2. `http://127.0.0.1:3002` (admin web)
 3. `http://127.0.0.1:3000/health` (core-api)
+4. `http://127.0.0.1:4104/app/v1/realtime/connect` (websocket upgrade endpoint)
 
 ## 6. Testing and Gates
 
@@ -110,11 +119,13 @@ Implemented quality gates in this slice:
 
 1. adapter unit/integration tests per web app (`src/lib/api.test.ts`)
 2. adapter and endpoint tests for each BFF
-3. realtime websocket route test
-4. `npm run test:app-layer` as app-layer test gate
+3. realtime websocket + publish route tests
+4. provider adapter tests for APNs/FCM payload routing
+5. `npm run test:app-layer` as app-layer test gate
 
 ## 7. Remaining Work To Full V1
 
 1. mobile app shells (consumer/courier) + KMP shared core
-2. feature flags, provider-specific APNs/FCM adapters, and offline queue semantics
-3. e2e journey gates across all four surfaces
+2. feature flags and offline queue semantics
+3. backend event-bus to realtime-gateway publish integration hardening
+4. e2e journey gates across all four surfaces

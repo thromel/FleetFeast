@@ -3,7 +3,8 @@ import test from "node:test";
 
 import { WebSocket } from "ws";
 
-import { createRealtimeGatewayServer, type PushFallbackMessage } from "./server.js";
+import type { PushFallbackMessage } from "./push-fallback.js";
+import { createRealtimeGatewayServer } from "./server.js";
 
 test("realtime gateway accepts websocket connections and publishes channel events", async () => {
   const gateway = createRealtimeGatewayServer();
@@ -144,5 +145,96 @@ test("realtime gateway does not send push fallback while socket is active", asyn
     ws.close();
   } finally {
     await gateway.app.close();
+  }
+});
+
+test("realtime publish endpoint fans out to connected websocket channel", async () => {
+  const gateway = createRealtimeGatewayServer();
+  await gateway.app.listen({ port: 0, host: "127.0.0.1" });
+
+  try {
+    const address = gateway.app.server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind realtime gateway test listener");
+    }
+
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${address.port}/app/v1/realtime/connect?channel=merchant.order.order-99`,
+    );
+
+    await new Promise<void>((resolve, reject) => {
+      ws.once("open", () => resolve());
+      ws.once("error", reject);
+    });
+
+    const messagePromise = new Promise<string>((resolve, reject) => {
+      ws.once("message", (data: import("ws").RawData) => resolve(String(data)));
+      ws.once("error", reject);
+    });
+
+    const publishResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/realtime/publish`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        channel: "merchant.order.order-99",
+        envelope: {
+          eventType: "order.confirmed.v1",
+          entityId: "order-99",
+          occurredAt: new Date().toISOString(),
+          traceId: "trace-publish-route-1",
+          payload: { status: "MERCHANT_ACCEPTED" },
+        },
+      }),
+    });
+
+    assert.equal(publishResponse.status, 200);
+    const publishedPayload = (await publishResponse.json()) as { published: boolean };
+    assert.equal(publishedPayload.published, true);
+
+    const message = await messagePromise;
+    const parsed = JSON.parse(message) as { entityId: string };
+    assert.equal(parsed.entityId, "order-99");
+    ws.close();
+  } finally {
+    await gateway.app.close();
+  }
+});
+
+test("realtime publish endpoint enforces API key when configured", async () => {
+  const previousApiKey = process.env.REALTIME_PUBLISH_API_KEY;
+  process.env.REALTIME_PUBLISH_API_KEY = "publish-key-1";
+
+  const gateway = createRealtimeGatewayServer();
+  await gateway.app.listen({ port: 0, host: "127.0.0.1" });
+
+  try {
+    const address = gateway.app.server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind realtime gateway test listener");
+    }
+
+    const unauthorized = await fetch(`http://127.0.0.1:${address.port}/app/v1/realtime/publish`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        channel: "admin.incident.incident-1",
+        envelope: {
+          eventType: "incident.created.v1",
+          entityId: "incident-1",
+          occurredAt: new Date().toISOString(),
+          traceId: "trace-publish-authz-1",
+          payload: { severity: "HIGH" },
+        },
+      }),
+    });
+
+    assert.equal(unauthorized.status, 401);
+  } finally {
+    await gateway.app.close();
+    if (previousApiKey === undefined) {
+      delete process.env.REALTIME_PUBLISH_API_KEY;
+    } else {
+      process.env.REALTIME_PUBLISH_API_KEY = previousApiKey;
+    }
   }
 });

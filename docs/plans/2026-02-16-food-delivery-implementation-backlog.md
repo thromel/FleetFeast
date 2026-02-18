@@ -464,12 +464,13 @@ Last updated: `2026-02-18`
 | A04 App runtime bootstrap for BFF services | Done | `main.ts` entrypoints and `start` scripts added for local runtime |
 | A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js `web-merchant` and `web-admin` apps implemented with live ops-bff integration; mobile surfaces pending |
 | A06 OIDC+PKCE and app-session exchange hardening | Done | Added shared OIDC verifier (JWKS + dev fallback), persona-aware role checks, rotating refresh tokens, replay detection, and device-bound refresh validation across all BFFs |
-| A07 Push fallback (APNs/FCM) and full realtime fanout | In progress | Realtime gateway now supports push registration/unregistration and fallback notification dispatch when no active socket; provider-specific adapters still pending |
+| A07 Push fallback (APNs/FCM) and full realtime fanout | Done | Added provider-specific APNs/FCM fallback adapters, internal publish endpoint with optional API-key guard, and full realtime gateway route/adapter test coverage |
 
 ### 12.2 Recent App Delivery Log
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
+| `uncommitted` | A07 | Added provider-specific APNs/FCM push adapters and `/app/v1/realtime/publish` fanout endpoint with API-key option |
 | `1d039fd` | A07 | Added realtime-gateway push fallback registration and dispatch baseline with websocket-vs-push behavior tests |
 | `3bead32` | A06 | Added shared `app-auth` package and hardened BFF session exchange/refresh flows with replay and device-binding tests |
 | `0a955fa` | A05 | Added runnable Next.js merchant/admin apps with typed API clients and tests |
@@ -494,3 +495,7 @@ Last updated: `2026-02-18`
 5. Realtime push fallback baseline validated via gateway tests for:
    - fallback delivery when no websocket subscriber exists
    - no fallback delivery while websocket channel is active
+6. Realtime provider adapters and publish endpoint validated for:
+   - APNs and FCM payload routing through provider-specific adapters
+   - `/app/v1/realtime/publish` websocket fanout path
+   - optional `REALTIME_PUBLISH_API_KEY` authorization enforcement

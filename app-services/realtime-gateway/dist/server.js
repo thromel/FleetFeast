@@ -2,16 +2,13 @@ import Fastify from "fastify";
 import websocketPlugin from "@fastify/websocket";
 import { WebSocket } from "ws";
 import { isRealtimeEnvelope } from "@fleetfeast/shared-contracts";
-class NoopPushFallbackNotifier {
-    async send(_message) {
-        return;
-    }
-}
+import { createPushFallbackNotifierFromEnv, } from "./push-fallback.js";
 export function createRealtimeGatewayServer(options = {}) {
     const app = Fastify();
     const subscribers = new Map();
     const pushRegistrations = new Map();
-    const notifier = options.pushFallbackNotifier ?? new NoopPushFallbackNotifier();
+    const notifier = options.pushFallbackNotifier ?? createPushFallbackNotifierFromEnv(process.env);
+    const publishApiKey = process.env.REALTIME_PUBLISH_API_KEY;
     app.register(async (instance) => {
         await instance.register(websocketPlugin);
         instance.route({
@@ -94,46 +91,78 @@ export function createRealtimeGatewayServer(options = {}) {
         }
         return { removed: true };
     });
+    app.post("/app/v1/realtime/publish", async (request, reply) => {
+        if (publishApiKey && request.headers["x-realtime-publish-key"] !== publishApiKey) {
+            reply.status(401);
+            return {
+                errorCode: "REALTIME_PUBLISH_UNAUTHORIZED",
+                message: "x-realtime-publish-key header is invalid",
+            };
+        }
+        const payload = request.body;
+        if (typeof payload?.channel !== "string" || payload.channel.trim().length === 0) {
+            reply.status(400);
+            return {
+                errorCode: "INVALID_REALTIME_PUBLISH_PAYLOAD",
+                message: "channel is required",
+            };
+        }
+        if (!isRealtimeEnvelope(payload.envelope)) {
+            reply.status(400);
+            return {
+                errorCode: "INVALID_REALTIME_PUBLISH_PAYLOAD",
+                message: "envelope is invalid",
+            };
+        }
+        await publishToChannel(payload.channel, payload.envelope);
+        return { published: true };
+    });
+    async function publishToChannel(channel, envelope) {
+        if (!isRealtimeEnvelope(envelope)) {
+            throw new Error("INVALID_REALTIME_ENVELOPE");
+        }
+        const channelSet = subscribers.get(channel);
+        const payload = JSON.stringify(envelope);
+        let openSocketCount = 0;
+        if (channelSet) {
+            for (const socket of channelSet) {
+                if (socket.readyState !== WebSocket.OPEN) {
+                    continue;
+                }
+                socket.send(payload);
+                openSocketCount += 1;
+            }
+        }
+        if (openSocketCount > 0) {
+            return;
+        }
+        const byUserId = pushRegistrations.get(channel);
+        if (!byUserId || byUserId.size === 0) {
+            return;
+        }
+        const results = await Promise.allSettled([...byUserId.values()].map((target) => notifier.send({
+            channel,
+            envelope,
+            target,
+            reason: "NO_ACTIVE_SOCKET",
+        })));
+        for (const result of results) {
+            if (result.status === "rejected") {
+                app.log.error({
+                    channel,
+                    error: result.reason,
+                }, "Failed to deliver push fallback notification");
+            }
+        }
+    }
     return {
         app,
-        async publishToChannel(channel, envelope) {
-            if (!isRealtimeEnvelope(envelope)) {
-                throw new Error("INVALID_REALTIME_ENVELOPE");
-            }
-            const channelSet = subscribers.get(channel);
-            const payload = JSON.stringify(envelope);
-            let openSocketCount = 0;
-            if (channelSet) {
-                for (const socket of channelSet) {
-                    if (socket.readyState !== WebSocket.OPEN) {
-                        continue;
-                    }
-                    socket.send(payload);
-                    openSocketCount += 1;
-                }
-            }
-            if (openSocketCount > 0) {
-                return;
-            }
-            const byUserId = pushRegistrations.get(channel);
-            if (!byUserId || byUserId.size === 0) {
-                return;
-            }
-            const results = await Promise.allSettled([...byUserId.values()].map((target) => notifier.send({
-                channel,
-                envelope,
-                target,
-                reason: "NO_ACTIVE_SOCKET",
-            })));
-            for (const result of results) {
-                if (result.status === "rejected") {
-                    app.log.error({
-                        channel,
-                        error: result.reason,
-                    }, "Failed to deliver push fallback notification");
-                }
-            }
-        },
+        publishToChannel,
     };
+}
+export function createRealtimeGatewayServerFromEnv() {
+    return createRealtimeGatewayServer({
+        pushFallbackNotifier: createPushFallbackNotifierFromEnv(process.env),
+    });
 }
 //# sourceMappingURL=server.js.map
