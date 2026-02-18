@@ -74,7 +74,7 @@ export class PayoutStatementService {
     return statement;
   }
 
-  listStatements(entityType: PayoutEntityType, entityId: string): PayoutStatement[] {
+  async listStatements(entityType: PayoutEntityType, entityId: string): Promise<PayoutStatement[]> {
     return this.statementRepository.listByEntity(entityType, entityId);
   }
 

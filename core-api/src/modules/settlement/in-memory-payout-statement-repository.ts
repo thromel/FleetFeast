@@ -7,7 +7,7 @@ export class InMemoryPayoutStatementRepository {
     this.statements.set(statement.statementId, statement);
   }
 
-  listByEntity(entityType: PayoutEntityType, entityId: string): PayoutStatement[] {
+  async listByEntity(entityType: PayoutEntityType, entityId: string): Promise<PayoutStatement[]> {
     return [...this.statements.values()]
       .filter((statement) => statement.entityType === entityType && statement.entityId === entityId)
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt));

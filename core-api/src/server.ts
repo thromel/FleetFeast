@@ -28,6 +28,7 @@ import { PersistentManualReviewRepository } from "./platform/persistence/reposit
 import { PersistentSupportTicketRepository } from "./platform/persistence/repositories/persistent-support-ticket-repository.js";
 import { PersistentSupportEscalationRepository } from "./platform/persistence/repositories/persistent-support-escalation-repository.js";
 import { PersistentComplianceAuditRepository } from "./platform/persistence/repositories/persistent-compliance-audit-repository.js";
+import { PersistentPayoutStatementRepository } from "./platform/persistence/repositories/persistent-payout-statement-repository.js";
 
 import { AuthError, AuthService } from "./modules/identity/auth-service.js";
 import {
@@ -1803,7 +1804,9 @@ export function createServer(options: CreateServerOptions = {}) {
     eventBus,
   );
   const payoutStatementService = new PayoutStatementService(
-    new InMemoryPayoutStatementRepository(),
+    persistenceEnabled
+      ? new PersistentPayoutStatementRepository(documentStore!)
+      : new InMemoryPayoutStatementRepository(),
     eventBus,
   );
   const notificationTemplateService = new NotificationTemplateService(eventBus);
@@ -2315,7 +2318,7 @@ export function createServer(options: CreateServerOptions = {}) {
           throw new Error("INVALID_MERCHANT_PAYOUT_QUERY");
         }
 
-        const statements = payoutStatementService.listStatements("MERCHANT", merchantId);
+        const statements = await payoutStatementService.listStatements("MERCHANT", merchantId);
         sendJson(response, 200, { statements });
         return;
       }
@@ -2326,7 +2329,7 @@ export function createServer(options: CreateServerOptions = {}) {
           throw new Error("INVALID_COURIER_PAYOUT_QUERY");
         }
 
-        const statements = payoutStatementService.listStatements("COURIER", courierId);
+        const statements = await payoutStatementService.listStatements("COURIER", courierId);
         sendJson(response, 200, { statements });
         return;
       }
