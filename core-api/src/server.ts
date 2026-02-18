@@ -35,6 +35,7 @@ import { PersistentNotificationReceiptRepository } from "./platform/persistence/
 import { PersistentDeliveryZoneRepository } from "./platform/persistence/repositories/persistent-delivery-zone-repository.js";
 import { PersistentOrderTimelineRepository } from "./platform/persistence/repositories/persistent-order-timeline-repository.js";
 import { PersistentRiskPolicyRepository } from "./platform/persistence/repositories/persistent-risk-policy-repository.js";
+import { PersistentSettlementReconciliationRepository } from "./platform/persistence/repositories/persistent-settlement-reconciliation-repository.js";
 
 import { AuthError, AuthService } from "./modules/identity/auth-service.js";
 import {
@@ -123,6 +124,7 @@ import {
 import { InMemorySettlementLedgerRepository } from "./modules/settlement/in-memory-settlement-ledger-repository.js";
 import { InMemoryPayoutBatchRepository } from "./modules/settlement/in-memory-payout-batch-repository.js";
 import { InMemoryPayoutStatementRepository } from "./modules/settlement/in-memory-payout-statement-repository.js";
+import { InMemorySettlementReconciliationRepository } from "./modules/settlement/in-memory-settlement-reconciliation-repository.js";
 import { PayoutService } from "./modules/settlement/payout-service.js";
 import { PayoutStatementService } from "./modules/settlement/payout-statement-service.js";
 import { SettlementReconciliationService } from "./modules/settlement/settlement-reconciliation-service.js";
@@ -1148,6 +1150,20 @@ function validateSettlementReconciliationPayload(
   };
 }
 
+function validateSettlementReconciliationQuery(searchParams: URLSearchParams): { limit?: number } {
+  const rawLimit = searchParams.get("limit");
+  if (rawLimit === null) {
+    return {};
+  }
+
+  const parsedLimit = Number(rawLimit);
+  if (!Number.isInteger(parsedLimit) || parsedLimit <= 0) {
+    throw new Error("INVALID_SETTLEMENT_RECONCILIATION_QUERY");
+  }
+
+  return { limit: parsedLimit };
+}
+
 function validatePayoutBatchPayload(payload: Record<string, unknown>): GeneratePayoutBatchInput {
   const scheduleId = payload.scheduleId;
   const runAt = payload.runAt;
@@ -1894,7 +1910,12 @@ export function createServer(options: CreateServerOptions = {}) {
       : new InMemorySettlementLedgerRepository(),
     eventBus,
   );
-  const settlementReconciliationService = new SettlementReconciliationService(eventBus);
+  const settlementReconciliationService = new SettlementReconciliationService(
+    eventBus,
+    persistenceEnabled
+      ? new PersistentSettlementReconciliationRepository(documentStore!)
+      : new InMemorySettlementReconciliationRepository(),
+  );
   const payoutService = new PayoutService(
     persistenceEnabled
       ? new PersistentPayoutBatchRepository(documentStore!)
@@ -2416,6 +2437,13 @@ export function createServer(options: CreateServerOptions = {}) {
         const input = validateSettlementReconciliationPayload(payload);
         const result = await settlementReconciliationService.reconcile(input);
         sendJson(response, 200, result);
+        return;
+      }
+
+      if (request.method === "GET" && pathname === "/internal/settlement/reconciliation/results") {
+        const query = validateSettlementReconciliationQuery(requestUrl.searchParams);
+        const results = await settlementReconciliationService.listResults(query.limit);
+        sendJson(response, 200, { results });
         return;
       }
 
@@ -2975,6 +3003,7 @@ export function createServer(options: CreateServerOptions = {}) {
             "INVALID_REFUND_APPROVAL_PAYLOAD",
             "INVALID_SETTLEMENT_JOURNAL_PAYLOAD",
             "INVALID_SETTLEMENT_RECONCILIATION_PAYLOAD",
+            "INVALID_SETTLEMENT_RECONCILIATION_QUERY",
             "INVALID_PAYOUT_BATCH_PAYLOAD",
             "INVALID_PAYOUT_SCHEDULE_RUN_PAYLOAD",
             "INVALID_PAYOUT_STATEMENT_PAYLOAD",

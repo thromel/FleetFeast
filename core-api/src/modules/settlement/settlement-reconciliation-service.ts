@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { InMemoryEventBus } from "../identity/in-memory-event-bus.js";
+import { InMemorySettlementReconciliationRepository } from "./in-memory-settlement-reconciliation-repository.js";
 import type {
   ReconcileSettlementInput,
   SettlementReconciliationExceptionCase,
@@ -9,7 +10,10 @@ import type {
 } from "./types.js";
 
 export class SettlementReconciliationService {
-  constructor(private readonly eventBus: InMemoryEventBus) {}
+  constructor(
+    private readonly eventBus: InMemoryEventBus,
+    private readonly repository: InMemorySettlementReconciliationRepository,
+  ) {}
 
   async reconcile(input: ReconcileSettlementInput): Promise<SettlementReconciliationResult> {
     const expectedByEntity = new Map(
@@ -62,8 +66,13 @@ export class SettlementReconciliationService {
         exceptionCount: result.exceptionCases.length,
       },
     });
+    await this.repository.append(result);
 
     return result;
+  }
+
+  async listResults(limit?: number): Promise<SettlementReconciliationResult[]> {
+    return this.repository.list(limit);
   }
 
   private sumAmounts(records: Map<string, number>): number {

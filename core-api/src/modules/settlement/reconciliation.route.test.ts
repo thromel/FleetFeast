@@ -74,3 +74,45 @@ test("internal settlement reconciliation route validates payload", async () => {
     listener.close();
   }
 });
+
+test("internal settlement reconciliation results route returns recent runs", async () => {
+  const app = createServer();
+  const listener = app.listen(0);
+
+  try {
+    const address = listener.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind test listener");
+    }
+
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const run = await fetch(`${baseUrl}/internal/settlement/reconciliation/run`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        expectedRecords: [{ entityId: "merchant-1", amount: 5000 }],
+        actualRecords: [{ entityId: "merchant-1", amount: 4900 }],
+        toleranceCents: 10,
+      }),
+    });
+
+    assert.equal(run.status, 200);
+
+    const list = await fetch(
+      `${baseUrl}/internal/settlement/reconciliation/results?limit=1`,
+      {
+        method: "GET",
+      },
+    );
+
+    assert.equal(list.status, 200);
+    const payload = (await list.json()) as {
+      results: Array<{ reconciliationId: string; exceptionCases: unknown[] }>;
+    };
+    assert.equal(payload.results.length, 1);
+    assert.ok(payload.results[0]?.reconciliationId);
+    assert.equal(payload.results[0]?.exceptionCases.length, 1);
+  } finally {
+    listener.close();
+  }
+});

@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { InMemoryEventBus } from "../identity/in-memory-event-bus.js";
+import { InMemorySettlementReconciliationRepository } from "./in-memory-settlement-reconciliation-repository.js";
 import { SettlementReconciliationService } from "./settlement-reconciliation-service.js";
 
 test("reconciliation flags mismatches above tolerance", async () => {
   const eventBus = new InMemoryEventBus();
-  const reconciliationService = new SettlementReconciliationService(eventBus);
+  const repository = new InMemorySettlementReconciliationRepository();
+  const reconciliationService = new SettlementReconciliationService(eventBus, repository);
 
   const result = await reconciliationService.reconcile({
     expectedRecords: [
@@ -27,4 +29,8 @@ test("reconciliation flags mismatches above tolerance", async () => {
     (event) => event.type === "settlement.reconciliation_completed.v1",
   );
   assert.ok(completedEvent);
+
+  const history = await reconciliationService.listResults(1);
+  assert.equal(history.length, 1);
+  assert.equal(history[0]?.reconciliationId, result.reconciliationId);
 });
