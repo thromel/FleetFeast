@@ -419,12 +419,14 @@ Last updated: `2026-02-18`
 | E08 Settlement/Payouts | In progress | Ledger, payout batches/schedules/statements done; reconciliation run/history implemented; processor-file ingest job still pending |
 | E09 Notifications | Done | Fanout, templates/locale, retry+DLQ, receipts implemented |
 | E10 Support/Risk/Compliance | Done | Tickets, interventions, SLA escalation, policy engine, manual reviews, compliance audit implemented |
-| E11 Observability/SRE | Partial | Tracing/logging and SLO APIs implemented; persistent log store and deeper DR/security hardening pending |
+| E11 Observability/SRE | Partial | Tracing/logging, SLO APIs, and durable structured-log persistence implemented; DR/security hardening still pending |
 
 ### 11.2 Recent Backend Delivery Log
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
+| `c8f98d0` | E08-S03 | Added reconciliation summary counters for dashboard-friendly API responses |
+| `3e1180f` | E11-S01 | Added persistent structured log repository and restart durability coverage |
 | `8f96f84` | E08-S03 | Added reconciliation history filter by exception state |
 | `578dbd4` | E08-S03 | Persisted reconciliation runs and added results API |
 | `61147b2` | E05-S05 | Hydrated durable outbox for timeline rebuild reliability |
