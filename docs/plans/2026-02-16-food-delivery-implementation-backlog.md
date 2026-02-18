@@ -416,7 +416,7 @@ Last updated: `2026-02-18`
 | E05 Order Orchestration | Done | State machine, cancellation matrix, dispatch request flow, timeline + rebuild implemented |
 | E06 Dispatch | Done | Go dispatch scoring/assign/reassign/telemetry implemented; core orchestration now supports dispatch assignment through gRPC client contracts |
 | E07 Payments | Done | Auth/capture/COD/refunds/audit flows implemented |
-| E08 Settlement/Payouts | In progress | Ledger, payout batches/schedules/statements done; reconciliation run/history + CSV ingest endpoint implemented; scheduled processor pull/import still pending |
+| E08 Settlement/Payouts | Done | Ledger, payout batches/schedules/statements, reconciliation run/history, CSV ingest, and scheduled import pipeline implemented |
 | E09 Notifications | Done | Fanout, templates/locale, retry+DLQ, receipts implemented |
 | E10 Support/Risk/Compliance | Done | Tickets, interventions, SLA escalation, policy engine, manual reviews, compliance audit implemented |
 | E11 Observability/SRE | Partial | Tracing/logging, SLO APIs, and durable structured-log persistence implemented; DR/security hardening still pending |
@@ -425,6 +425,7 @@ Last updated: `2026-02-18`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
+| `34b0438` | E08-S03 | Added scheduled settlement reconciliation import path with idempotent runs and persistence coverage |
 | `fefc707` | E06-S02 / E05-S03 | Added core dispatch orchestration path with injectable gRPC assignment client and route coverage |
 | `8fe4b9f` | E08-S03 | Added settlement reconciliation CSV ingest endpoint with payload validation and test coverage |
 | `c8f98d0` | E08-S03 | Added reconciliation summary counters for dashboard-friendly API responses |
@@ -447,6 +448,5 @@ Last updated: `2026-02-18`
 
 ### 11.3 Next Backend Features Queue
 
-1. Add scheduled processor settlement-file pull/import that feeds the reconciliation ingest path.
-2. Implement `E11-S04` backup/PITR and DR failover runbook automation.
-3. Implement `E11-S06` security hardening checks and IAM least-privilege audit automation.
+1. Implement `E11-S04` backup/PITR and DR failover runbook automation.
+2. Implement `E11-S06` security hardening checks and IAM least-privilege audit automation.
