@@ -419,7 +419,7 @@ Last updated: `2026-02-18`
 | E08 Settlement/Payouts | Done | Ledger, payout batches/schedules/statements, reconciliation run/history, CSV ingest, and scheduled import pipeline implemented |
 | E09 Notifications | Done | Fanout, templates/locale, retry+DLQ, receipts implemented |
 | E10 Support/Risk/Compliance | Done | Tickets, interventions, SLA escalation, policy engine, manual reviews, compliance audit implemented |
-| E11 Observability/SRE | Partial | Tracing/logging, SLO APIs, and durable structured-log persistence implemented; DR/security hardening still pending |
+| E11 Observability/SRE | Done | Tracing/logging + durable persistence implemented; DR automation, DR evidence capture, and security hardening audit gates are in place and passing |
 
 ### 11.2 Recent Backend Delivery Log
 
@@ -448,5 +448,4 @@ Last updated: `2026-02-18`
 
 ### 11.3 Next Backend Features Queue
 
-1. Implement `E11-S04` backup/PITR and DR failover runbook automation.
-2. Implement `E11-S06` security hardening checks and IAM least-privilege audit automation.
+1. No open backend features remain in the current Balanced V1 backlog scope.
