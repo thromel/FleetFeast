@@ -91,6 +91,24 @@ export interface SettlementReconciliationResult {
   exceptionCases: SettlementReconciliationExceptionCase[];
 }
 
+export interface RunSettlementReconciliationImportInput {
+  scheduleId: string;
+  runAt: string;
+  sourceFileName: string;
+  reconciliationInput: ReconcileSettlementInput;
+  ingestedRecords: number;
+}
+
+export interface SettlementReconciliationImportRun {
+  importRunId: string;
+  scheduleId: string;
+  runAt: string;
+  sourceFileName: string;
+  ingestedRecords: number;
+  createdAt: string;
+  result: SettlementReconciliationResult;
+}
+
 export interface PayoutStatementLineItem {
   label: string;
   amount: number;

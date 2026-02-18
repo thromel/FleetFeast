@@ -36,6 +36,7 @@ import { PersistentDeliveryZoneRepository } from "./platform/persistence/reposit
 import { PersistentOrderTimelineRepository } from "./platform/persistence/repositories/persistent-order-timeline-repository.js";
 import { PersistentRiskPolicyRepository } from "./platform/persistence/repositories/persistent-risk-policy-repository.js";
 import { PersistentSettlementReconciliationRepository } from "./platform/persistence/repositories/persistent-settlement-reconciliation-repository.js";
+import { PersistentSettlementReconciliationImportRepository } from "./platform/persistence/repositories/persistent-settlement-reconciliation-import-repository.js";
 import { PersistentStructuredLogRepository } from "./platform/persistence/repositories/persistent-structured-log-repository.js";
 
 import { AuthError, AuthService } from "./modules/identity/auth-service.js";
@@ -127,8 +128,10 @@ import { InMemorySettlementLedgerRepository } from "./modules/settlement/in-memo
 import { InMemoryPayoutBatchRepository } from "./modules/settlement/in-memory-payout-batch-repository.js";
 import { InMemoryPayoutStatementRepository } from "./modules/settlement/in-memory-payout-statement-repository.js";
 import { InMemorySettlementReconciliationRepository } from "./modules/settlement/in-memory-settlement-reconciliation-repository.js";
+import { InMemorySettlementReconciliationImportRepository } from "./modules/settlement/in-memory-settlement-reconciliation-import-repository.js";
 import { PayoutService } from "./modules/settlement/payout-service.js";
 import { PayoutStatementService } from "./modules/settlement/payout-statement-service.js";
+import { SettlementReconciliationImportService } from "./modules/settlement/settlement-reconciliation-import-service.js";
 import { SettlementReconciliationService } from "./modules/settlement/settlement-reconciliation-service.js";
 import { InMemorySupportTicketRepository } from "./modules/support/in-memory-support-ticket-repository.js";
 import { InMemorySupportEscalationRepository } from "./modules/support/in-memory-support-escalation-repository.js";
@@ -175,6 +178,7 @@ import type {
   PayoutEntityType,
   PublishPayoutStatementInput,
   ReconcileSettlementInput,
+  RunSettlementReconciliationImportInput,
 } from "./modules/settlement/types.js";
 import type {
   CreateSupportTicketInput,
@@ -1324,6 +1328,44 @@ function parseSettlementReconciliationCsv(
   });
 }
 
+function validateSettlementReconciliationImportRunPayload(
+  scheduleId: string,
+  payload: Record<string, unknown>,
+): RunSettlementReconciliationImportInput {
+  const runAt = payload.runAt;
+  const sourceFileName = payload.sourceFileName;
+
+  if (
+    typeof scheduleId !== "string" ||
+    scheduleId.trim().length === 0 ||
+    typeof runAt !== "string" ||
+    Number.isNaN(new Date(runAt).getTime()) ||
+    typeof sourceFileName !== "string" ||
+    sourceFileName.trim().length === 0
+  ) {
+    throw new Error("INVALID_SETTLEMENT_RECONCILIATION_IMPORT_RUN_PAYLOAD");
+  }
+
+  let normalizedInput: ReconcileSettlementInput & { ingestedRecords: number };
+  try {
+    normalizedInput = validateSettlementReconciliationIngestPayload(payload);
+  } catch {
+    throw new Error("INVALID_SETTLEMENT_RECONCILIATION_IMPORT_RUN_PAYLOAD");
+  }
+
+  return {
+    scheduleId,
+    runAt,
+    sourceFileName,
+    ingestedRecords: normalizedInput.ingestedRecords,
+    reconciliationInput: {
+      expectedRecords: normalizedInput.expectedRecords,
+      actualRecords: normalizedInput.actualRecords,
+      toleranceCents: normalizedInput.toleranceCents,
+    },
+  };
+}
+
 function validateSettlementReconciliationQuery(searchParams: URLSearchParams): {
   limit?: number;
   hasExceptions?: boolean;
@@ -2110,6 +2152,13 @@ export function createServer(options: CreateServerOptions = {}) {
       ? new PersistentSettlementReconciliationRepository(documentStore!)
       : new InMemorySettlementReconciliationRepository(),
   );
+  const settlementReconciliationImportService = new SettlementReconciliationImportService(
+    persistenceEnabled
+      ? new PersistentSettlementReconciliationImportRepository(documentStore!)
+      : new InMemorySettlementReconciliationImportRepository(),
+    settlementReconciliationService,
+    eventBus,
+  );
   const payoutService = new PayoutService(
     persistenceEnabled
       ? new PersistentPayoutBatchRepository(documentStore!)
@@ -2233,6 +2282,9 @@ export function createServer(options: CreateServerOptions = {}) {
       );
       const payoutScheduleRunRouteMatch = pathname.match(
         /^\/internal\/settlement\/payout-schedules\/([^/]+)\/run$/,
+      );
+      const reconciliationImportScheduleRunRouteMatch = pathname.match(
+        /^\/internal\/settlement\/reconciliation\/import-schedules\/([^/]+)\/run$/,
       );
       const paymentAuditRouteMatch = pathname.match(/^\/internal\/payments\/audit\/([^/]+)$/);
       const supportTicketTimelineRouteMatch = pathname.match(
@@ -2644,6 +2696,15 @@ export function createServer(options: CreateServerOptions = {}) {
           ...result,
           ingestedRecords: input.ingestedRecords,
         });
+        return;
+      }
+
+      if (request.method === "POST" && reconciliationImportScheduleRunRouteMatch) {
+        const payload = await parseJsonBody(request);
+        const scheduleId = decodeURIComponent(reconciliationImportScheduleRunRouteMatch[1] ?? "");
+        const input = validateSettlementReconciliationImportRunPayload(scheduleId, payload);
+        const result = await settlementReconciliationImportService.runScheduledImport(input);
+        sendJson(response, result.created ? 201 : 200, result.run);
         return;
       }
 
@@ -3244,6 +3305,7 @@ export function createServer(options: CreateServerOptions = {}) {
             "INVALID_SETTLEMENT_JOURNAL_PAYLOAD",
             "INVALID_SETTLEMENT_RECONCILIATION_PAYLOAD",
             "INVALID_SETTLEMENT_RECONCILIATION_INGEST_PAYLOAD",
+            "INVALID_SETTLEMENT_RECONCILIATION_IMPORT_RUN_PAYLOAD",
             "INVALID_SETTLEMENT_RECONCILIATION_QUERY",
             "INVALID_PAYOUT_BATCH_PAYLOAD",
             "INVALID_PAYOUT_SCHEDULE_RUN_PAYLOAD",
