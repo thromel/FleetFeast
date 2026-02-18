@@ -2,6 +2,8 @@
 node_modules/
 core-api/node_modules/
 core-api/dist/
+apps/**/.next/
+apps/**/dist-test/
 
 # Go
 *.test
