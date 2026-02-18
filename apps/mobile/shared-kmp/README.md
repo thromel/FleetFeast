@@ -6,7 +6,8 @@ Current scope:
 
 1. shared app-layer contract models (`AppSession*`, feature flags, geo contract)
 2. offline action queue semantics with idempotency + retry transitions
-3. JVM-testable baseline for iterative expansion into full iOS/Android clients
+3. typed BFF/realtime client adapters over an abstract transport (`BffTransport`)
+4. JVM-testable baseline for iterative expansion into full iOS/Android clients
 
 ## Run Tests (Docker)
 

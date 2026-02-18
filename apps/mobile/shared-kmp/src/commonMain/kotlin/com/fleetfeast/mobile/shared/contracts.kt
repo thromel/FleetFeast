@@ -70,6 +70,86 @@ data class AppSessionExchangeResponse(
   val tokenPair: AppSessionTokenPair,
 )
 
+data class ConsumerOrderView(
+  val id: String,
+  val status: String,
+  val timelineVersion: Long,
+)
+
+data class CourierJobView(
+  val jobId: String,
+  val orderId: String,
+  val status: String,
+)
+
+data class MerchantOrderView(
+  val id: String,
+  val status: String,
+)
+
+data class AdminIncidentView(
+  val id: String,
+  val severity: String,
+)
+
+data class ConsumerOrderPayload(
+  val order: ConsumerOrderView,
+)
+
+data class CourierJobsPayload(
+  val jobs: List<CourierJobView>,
+)
+
+data class MerchantOrdersPayload(
+  val orders: List<MerchantOrderView>,
+)
+
+data class AdminIncidentsPayload(
+  val incidents: List<AdminIncidentView>,
+)
+
+enum class PushProvider {
+  APNS,
+  FCM,
+}
+
+data class RealtimeEnvelope(
+  val eventType: String,
+  val entityId: String,
+  val occurredAt: String,
+  val traceId: String,
+  val payload: Map<String, String>,
+)
+
+data class RealtimePushRegistrationRequest(
+  val channel: String,
+  val userId: String,
+  val pushToken: String,
+  val provider: PushProvider,
+)
+
+data class RealtimePushRegistrationResponse(
+  val registered: Boolean,
+)
+
+data class RealtimePushUnregisterRequest(
+  val channel: String,
+  val userId: String,
+)
+
+data class RealtimePushUnregisterResponse(
+  val removed: Boolean,
+)
+
+data class RealtimePublishRequest(
+  val channel: String,
+  val envelope: RealtimeEnvelope,
+)
+
+data class RealtimePublishResponse(
+  val published: Boolean,
+)
+
 interface GeoProvider {
   suspend fun geocode(address: String): GeoCoordinate?
   suspend fun estimateEtaSeconds(origin: GeoCoordinate, destination: GeoCoordinate): Int
