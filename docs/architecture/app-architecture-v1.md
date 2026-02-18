@@ -19,6 +19,7 @@ Current implemented slice:
 2. persona BFFs (`consumer-bff`, `courier-bff`, `ops-bff`)
 3. `realtime-gateway` websocket baseline
 4. OIDC-backed app-session exchange with rotating refresh tokens in BFF layer
+5. push fallback registration and dispatch baseline in realtime gateway
 
 ## 2. Topology
 
@@ -34,6 +35,9 @@ Current implemented slice:
 2. `app-services/courier-bff` exposes `/app/v1/courier/*`
 3. `app-services/ops-bff` exposes `/app/v1/merchant/*` and `/app/v1/admin/*`
 4. `app-services/realtime-gateway` exposes websocket `/app/v1/realtime/connect`
+5. `app-services/realtime-gateway` exposes push registration routes:
+   - `POST /app/v1/realtime/push/register`
+   - `POST /app/v1/realtime/push/unregister`
 
 ### Core Platform Layer
 
@@ -112,5 +116,5 @@ Implemented quality gates in this slice:
 ## 7. Remaining Work To Full V1
 
 1. mobile app shells (consumer/courier) + KMP shared core
-2. feature flags, push fallback (APNs/FCM), and offline queue semantics
+2. feature flags, provider-specific APNs/FCM adapters, and offline queue semantics
 3. e2e journey gates across all four surfaces

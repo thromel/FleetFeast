@@ -464,7 +464,7 @@ Last updated: `2026-02-18`
 | A04 App runtime bootstrap for BFF services | Done | `main.ts` entrypoints and `start` scripts added for local runtime |
 | A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js `web-merchant` and `web-admin` apps implemented with live ops-bff integration; mobile surfaces pending |
 | A06 OIDC+PKCE and app-session exchange hardening | Done | Added shared OIDC verifier (JWKS + dev fallback), persona-aware role checks, rotating refresh tokens, replay detection, and device-bound refresh validation across all BFFs |
-| A07 Push fallback (APNs/FCM) and full realtime fanout | Not started | Realtime websocket baseline complete; push fallback still pending |
+| A07 Push fallback (APNs/FCM) and full realtime fanout | In progress | Realtime gateway now supports push registration/unregistration and fallback notification dispatch when no active socket; provider-specific adapters still pending |
 
 ### 12.2 Recent App Delivery Log
 
@@ -490,3 +490,6 @@ Last updated: `2026-02-18`
    - `http://127.0.0.1:3001` merchant UI
    - `http://127.0.0.1:3002` admin UI
    - `http://127.0.0.1:3000/health` core-api health
+5. Realtime push fallback baseline validated via gateway tests for:
+   - fallback delivery when no websocket subscriber exists
+   - no fallback delivery while websocket channel is active

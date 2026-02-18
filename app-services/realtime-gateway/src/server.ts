@@ -5,15 +5,48 @@ import { WebSocket } from "ws";
 import { isRealtimeEnvelope, type RealtimeEnvelope } from "@fleetfeast/shared-contracts";
 
 type ChannelSubscribers = Map<string, Set<WebSocket>>;
+type PushRegistrationsByChannel = Map<string, Map<string, PushFallbackTarget>>;
+
+export type PushProvider = "apns" | "fcm";
+
+export interface PushFallbackTarget {
+  channel: string;
+  userId: string;
+  pushToken: string;
+  provider: PushProvider;
+}
+
+export interface PushFallbackMessage {
+  channel: string;
+  envelope: RealtimeEnvelope;
+  target: PushFallbackTarget;
+  reason: "NO_ACTIVE_SOCKET";
+}
+
+export interface PushFallbackNotifier {
+  send(message: PushFallbackMessage): Promise<void>;
+}
+
+export interface RealtimeGatewayOptions {
+  pushFallbackNotifier?: PushFallbackNotifier;
+}
+
+class NoopPushFallbackNotifier implements PushFallbackNotifier {
+  async send(_message: PushFallbackMessage): Promise<void> {
+    return;
+  }
+}
 
 export interface RealtimeGateway {
   app: FastifyInstance;
-  publishToChannel(channel: string, envelope: RealtimeEnvelope): void;
+  publishToChannel(channel: string, envelope: RealtimeEnvelope): Promise<void>;
 }
 
-export function createRealtimeGatewayServer(): RealtimeGateway {
+export function createRealtimeGatewayServer(options: RealtimeGatewayOptions = {}): RealtimeGateway {
   const app = Fastify();
   const subscribers: ChannelSubscribers = new Map();
+  const pushRegistrations: PushRegistrationsByChannel = new Map();
+  const notifier = options.pushFallbackNotifier ?? new NoopPushFallbackNotifier();
 
   app.register(async (instance) => {
     await instance.register(websocketPlugin);
@@ -55,25 +88,126 @@ export function createRealtimeGatewayServer(): RealtimeGateway {
     });
   });
 
+  app.post("/app/v1/realtime/push/register", async (request, reply) => {
+    const payload = request.body as {
+      channel?: unknown;
+      userId?: unknown;
+      pushToken?: unknown;
+      provider?: unknown;
+    };
+
+    if (
+      typeof payload?.channel !== "string" ||
+      payload.channel.trim().length === 0 ||
+      typeof payload?.userId !== "string" ||
+      payload.userId.trim().length === 0 ||
+      typeof payload?.pushToken !== "string" ||
+      payload.pushToken.trim().length === 0 ||
+      (payload?.provider !== "apns" && payload?.provider !== "fcm")
+    ) {
+      reply.status(400);
+      return {
+        errorCode: "INVALID_PUSH_REGISTRATION_PAYLOAD",
+        message: "channel, userId, pushToken, and provider (apns|fcm) are required",
+      };
+    }
+
+    const byUserId = pushRegistrations.get(payload.channel) ?? new Map<string, PushFallbackTarget>();
+    byUserId.set(payload.userId, {
+      channel: payload.channel,
+      userId: payload.userId,
+      pushToken: payload.pushToken,
+      provider: payload.provider,
+    });
+    pushRegistrations.set(payload.channel, byUserId);
+
+    return { registered: true };
+  });
+
+  app.post("/app/v1/realtime/push/unregister", async (request, reply) => {
+    const payload = request.body as {
+      channel?: unknown;
+      userId?: unknown;
+    };
+
+    if (
+      typeof payload?.channel !== "string" ||
+      payload.channel.trim().length === 0 ||
+      typeof payload?.userId !== "string" ||
+      payload.userId.trim().length === 0
+    ) {
+      reply.status(400);
+      return {
+        errorCode: "INVALID_PUSH_UNREGISTER_PAYLOAD",
+        message: "channel and userId are required",
+      };
+    }
+
+    const byUserId = pushRegistrations.get(payload.channel);
+    if (!byUserId) {
+      return { removed: false };
+    }
+
+    byUserId.delete(payload.userId);
+    if (byUserId.size === 0) {
+      pushRegistrations.delete(payload.channel);
+    }
+
+    return { removed: true };
+  });
+
   return {
     app,
-    publishToChannel(channel: string, envelope: RealtimeEnvelope): void {
+    async publishToChannel(channel: string, envelope: RealtimeEnvelope): Promise<void> {
       if (!isRealtimeEnvelope(envelope)) {
         throw new Error("INVALID_REALTIME_ENVELOPE");
       }
 
       const channelSet = subscribers.get(channel);
-      if (!channelSet) {
+      const payload = JSON.stringify(envelope);
+      let openSocketCount = 0;
+
+      if (channelSet) {
+        for (const socket of channelSet) {
+          if (socket.readyState !== WebSocket.OPEN) {
+            continue;
+          }
+
+          socket.send(payload);
+          openSocketCount += 1;
+        }
+      }
+
+      if (openSocketCount > 0) {
         return;
       }
 
-      const payload = JSON.stringify(envelope);
-      for (const socket of channelSet) {
-        if (socket.readyState !== WebSocket.OPEN) {
-          continue;
-        }
+      const byUserId = pushRegistrations.get(channel);
+      if (!byUserId || byUserId.size === 0) {
+        return;
+      }
 
-        socket.send(payload);
+      const results = await Promise.allSettled(
+        [...byUserId.values()].map((target) =>
+          notifier.send({
+            channel,
+            envelope,
+            target,
+            reason: "NO_ACTIVE_SOCKET",
+          }),
+        ),
+      );
+
+      for (const result of results) {
+        if (result.status === "rejected") {
+          app.log.error(
+            {
+              channel,
+              error: result.reason,
+            },
+            "Failed to deliver push fallback notification",
+          );
+        }
       }
     },
   };
