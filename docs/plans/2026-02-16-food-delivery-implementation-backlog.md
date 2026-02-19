@@ -462,7 +462,7 @@ Last updated: `2026-02-18`
 | A02 Persona BFF services + realtime gateway skeleton | Done | `consumer-bff`, `courier-bff`, `ops-bff`, and `realtime-gateway` implemented with route-level tests |
 | A03 BFF-to-core backend connectivity | Done | Core API adapters implemented in all three BFFs with test coverage against backend HTTP stubs |
 | A04 App runtime bootstrap for BFF services | Done | `main.ts` entrypoints and `start` scripts added for local runtime |
-| A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js surfaces are live; mobile now includes tested `shared-kmp` contracts/offline queue + typed BFF/realtime clients + queue-store rehydration + feature-flag client baseline + HTTP transport adapter boundary + default JSON mapper + JVM HTTP executor + courier replay workflow service + courier BFF-backed remote feature-flag snapshot source and iOS/Android shell directories |
+| A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js surfaces are live; mobile now includes tested `shared-kmp` contracts/offline queue + typed BFF/realtime clients + queue-store rehydration + feature-flag client baseline + HTTP transport adapter boundary + default JSON mapper + JVM HTTP executor + courier replay workflow service + consumer/courier BFF-backed remote feature-flag snapshot sources and iOS/Android shell directories |
 | A06 OIDC+PKCE and app-session exchange hardening | Done | Added shared OIDC verifier (JWKS + dev fallback), persona-aware role checks, rotating refresh tokens, replay detection, and device-bound refresh validation across all BFFs |
 | A07 Push fallback (APNs/FCM) and full realtime fanout | Done | Added provider-specific APNs/FCM fallback adapters, internal publish endpoint with optional API-key guard, and full realtime gateway route/adapter test coverage |
 
@@ -470,6 +470,7 @@ Last updated: `2026-02-18`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
+| `6693614` | A05 | Added `/app/v1/consumer/feature-flags` route in consumer-bff plus shared-kmp client/source integration for remote consumer feature-flag snapshot retrieval |
 | `9244fc1` | A05 | Added `/app/v1/courier/feature-flags` route in courier-bff plus shared-kmp client/source integration for remote feature-flag snapshot retrieval |
 | `3220286` | A05 | Added `DefaultJsonHttpBodyMapper` and `JvmHttpTransportExecutor` with JVM integration tests covering live HTTP round-trip through typed consumer client |
 | `a340636` | A05 | Added `CourierWorkflowService` tying feature flags to persistent offline action replay and retry semantics |
@@ -530,4 +531,5 @@ Last updated: `2026-02-18`
    - verifies typed consumer client calls live HTTP endpoints through `JvmHttpTransportExecutor`
 14. Remote feature-flag source integration validation:
    - verifies `GET /app/v1/courier/feature-flags` returns typed snapshot payload in courier-bff
-   - verifies `CourierBffClient.getFeatureFlags` query mapping and `CourierBffFeatureFlagSnapshotSource` fetch behavior
+   - verifies `GET /app/v1/consumer/feature-flags` returns typed snapshot payload in consumer-bff
+   - verifies `ConsumerBffClient.getFeatureFlags` and `CourierBffClient.getFeatureFlags` query mapping plus snapshot source fetch behavior

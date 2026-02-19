@@ -21,7 +21,7 @@ Current implemented slice:
 4. OIDC-backed app-session exchange with rotating refresh tokens in BFF layer
 5. push fallback with provider-specific APNs/FCM adapters in realtime gateway
 6. internal realtime publish endpoint for channel fanout (`/app/v1/realtime/publish`)
-7. mobile scaffold with `apps/mobile/shared-kmp` (contracts + offline queue + typed BFF/realtime clients + queue-store rehydration + feature-flag caching client + HTTP transport adapter boundary + default JSON body mapper + JVM HTTP executor + courier replay workflow service) and native shell directories for iOS/Android
+7. mobile scaffold with `apps/mobile/shared-kmp` (contracts + offline queue + typed BFF/realtime clients + queue-store rehydration + feature-flag caching client + HTTP transport adapter boundary + default JSON body mapper + JVM HTTP executor + courier replay workflow service + consumer/courier remote feature-flag snapshot sources) and native shell directories for iOS/Android
 
 ## 2. Topology
 
@@ -46,6 +46,8 @@ Current implemented slice:
    - `POST /app/v1/realtime/publish`
 7. `app-services/courier-bff` exposes feature flag snapshot route:
    - `GET /app/v1/courier/feature-flags`
+8. `app-services/consumer-bff` exposes feature flag snapshot route:
+   - `GET /app/v1/consumer/feature-flags`
 
 ### Core Platform Layer
 
@@ -62,7 +64,7 @@ Current implemented slice:
 6. Mobile clients consume BFF/realtime through typed `shared-kmp` adapters over an abstract transport boundary (`BffTransport`).
 7. `shared-kmp` includes an HTTP transport adapter (`HttpBffTransport`) that converts typed requests into URL/query/header/body HTTP calls through injectable executor/mapper interfaces.
 8. current shared-kmp baseline now includes `DefaultJsonHttpBodyMapper` and `JvmHttpTransportExecutor` so typed clients can call live BFF endpoints through concrete transport on JVM.
-9. courier shared-kmp flow now supports remote feature flag snapshots via `CourierBffClient.getFeatureFlags` and `CourierBffFeatureFlagSnapshotSource`.
+9. consumer/courier shared-kmp flow now supports remote feature flag snapshots via `ConsumerBffClient.getFeatureFlags`/`CourierBffClient.getFeatureFlags` and corresponding snapshot source adapters.
 
 Current concrete adapter mappings:
 
@@ -71,6 +73,7 @@ Current concrete adapter mappings:
 3. `ops-bff` -> `GET /api/v1/merchant/orders?merchantId=...`
 4. `ops-bff` -> `GET /internal/observability/logs` (incident projection source)
 5. `courier-bff` -> `GET /app/v1/courier/feature-flags?userId=...&role=...`
+6. `consumer-bff` -> `GET /app/v1/consumer/feature-flags?userId=...&role=...`
 
 Session endpoints:
 
@@ -135,11 +138,11 @@ Implemented quality gates in this slice:
 6. `npm run test:mobile-shared-kmp` as KMP shared-core gate (Docker Gradle `jvmTest`)
 7. shared-kmp typed client tests for consumer/courier/ops/realtime route and payload mapping
 8. shared-kmp JVM integration tests for JSON mapping and live HTTP round-trip using `JvmHttpTransportExecutor`
-9. courier feature-flag integration tests across BFF route, shared-kmp client query mapping, and BFF-backed snapshot source
+9. consumer/courier feature-flag integration tests across BFF routes, shared-kmp client query mapping, and BFF-backed snapshot sources
 
 ## 7. Remaining Work To Full V1
 
 1. full native mobile project wiring (Compose/SwiftUI app projects + build pipelines)
-2. shared-kmp expansion: production-grade persistence implementation (e.g., SQLDelight), broader feature-flag source integration for consumer/ops personas, and Android/iOS concrete transport implementations aligned to platform networking stacks
+2. shared-kmp expansion: production-grade persistence implementation (e.g., SQLDelight), remaining feature-flag source integration for ops personas, and Android/iOS concrete transport implementations aligned to platform networking stacks
 3. backend event-bus to realtime-gateway publish integration hardening
 4. e2e journey gates across all four surfaces
