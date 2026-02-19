@@ -51,4 +51,17 @@ public struct ConsumerAppShell {
         let query = components.percentEncodedQuery ?? ""
         return "/app/v1/consumer/feature-flags?\(query)"
     }
+
+    public func makeBackendClient(httpClient: HTTPClient = URLSessionHTTPClient()) -> ConsumerBackendClient {
+        ConsumerBackendClient(
+            baseURL: config.bffBaseURL,
+            httpClient: httpClient
+        )
+    }
+
+    public func makeAuthSessionManager(httpClient: HTTPClient = URLSessionHTTPClient()) -> ConsumerAuthSessionManager {
+        ConsumerAuthSessionManager(
+            client: makeBackendClient(httpClient: httpClient)
+        )
+    }
 }

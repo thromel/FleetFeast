@@ -28,6 +28,23 @@ class ConsumerAndroidShell(
     return "/app/v1/consumer/feature-flags?${queryParts.joinToString("&")}" 
   }
 
+  fun createBackendClient(
+    transport: HttpTransport = UrlConnectionHttpTransport(),
+  ): ConsumerBackendClient {
+    return ConsumerBackendClient(
+      baseUrl = bffBaseUrl,
+      transport = transport,
+    )
+  }
+
+  fun createAuthSessionManager(
+    transport: HttpTransport = UrlConnectionHttpTransport(),
+  ): ConsumerAuthSessionManager {
+    return ConsumerAuthSessionManager(
+      createBackendClient(transport),
+    )
+  }
+
   private fun encode(value: String): String {
     return java.net.URLEncoder.encode(value, Charsets.UTF_8).replace("+", "%20")
   }

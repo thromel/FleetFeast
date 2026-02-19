@@ -64,4 +64,17 @@ public struct CourierAppShell {
     public func realtimeConnectPath() -> String {
         return "/app/v1/realtime/connect"
     }
+
+    public func makeBackendClient(httpClient: HTTPClient = URLSessionHTTPClient()) -> CourierBackendClient {
+        CourierBackendClient(
+            baseURL: config.bffBaseURL,
+            httpClient: httpClient
+        )
+    }
+
+    public func makeAuthSessionManager(httpClient: HTTPClient = URLSessionHTTPClient()) -> CourierAuthSessionManager {
+        CourierAuthSessionManager(
+            client: makeBackendClient(httpClient: httpClient)
+        )
+    }
 }

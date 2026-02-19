@@ -34,6 +34,23 @@ class CourierAndroidShell(
     return "/app/v1/realtime/connect"
   }
 
+  fun createBackendClient(
+    transport: HttpTransport = UrlConnectionHttpTransport(),
+  ): CourierBackendClient {
+    return CourierBackendClient(
+      baseUrl = bffBaseUrl,
+      transport = transport,
+    )
+  }
+
+  fun createAuthSessionManager(
+    transport: HttpTransport = UrlConnectionHttpTransport(),
+  ): CourierAuthSessionManager {
+    return CourierAuthSessionManager(
+      createBackendClient(transport),
+    )
+  }
+
   private fun encode(value: String): String {
     return java.net.URLEncoder.encode(value, Charsets.UTF_8).replace("+", "%20")
   }

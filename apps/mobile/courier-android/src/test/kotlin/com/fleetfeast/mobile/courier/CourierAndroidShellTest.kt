@@ -186,6 +186,32 @@ class CourierAndroidShellTest {
 
     assertTrue(error.message?.contains("No active session") == true)
   }
+
+  @Test
+  fun shell_creates_auth_session_manager_using_configured_base_url() {
+    val shell = CourierAndroidShell(
+      bffBaseUrl = "http://127.0.0.1:4102",
+      realtimeBaseUrl = "http://127.0.0.1:4104",
+    )
+    val transport = RecordingTransport(
+      responsesByPath = mapOf(
+        "/app/v1/courier/session/exchange" to HttpTransportResponse(
+          statusCode = 200,
+          body = "{\"session\":{\"sessionId\":\"session-1\",\"userId\":\"courier-1\",\"role\":\"courier\",\"persona\":\"courier\",\"traceId\":\"trace-1\",\"refreshTokenId\":\"rt-1\",\"issuedAt\":\"2026-02-19T00:00:00Z\",\"expiresAt\":\"2026-02-19T01:00:00Z\"},\"tokenPair\":{\"tokenType\":\"Bearer\",\"accessToken\":\"access-1\",\"refreshToken\":\"refresh-1\",\"expiresInSeconds\":3600,\"refreshExpiresInSeconds\":2592000,\"refreshExpiresAt\":\"2026-03-21T00:00:00Z\"}}",
+        ),
+      ),
+    )
+
+    val manager = shell.createAuthSessionManager(transport)
+    val response = manager.signIn(
+      oidcToken = "dev:courier-1:courier@fleetfeast.dev:courier",
+      traceId = "trace-1",
+      deviceId = "device-1",
+    )
+
+    assertEquals("courier", response.session.persona)
+    assertEquals("/app/v1/courier/session/exchange", transport.paths[0])
+  }
 }
 
 private class RecordingTransport(
