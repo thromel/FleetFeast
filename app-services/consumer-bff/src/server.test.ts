@@ -8,9 +8,21 @@ import { createConsumerBffServer, createConsumerCoreApiDependencies } from "./se
 
 function createTestConsumerDependencies(
   getOrderById: (orderId: string) => Promise<{ id: string; status: string; timelineVersion: number }>,
+  getFeatureFlagSnapshot: () => Promise<{
+    flags: Record<string, boolean>;
+    ttlSeconds: number;
+    generatedAtEpochMillis: number;
+  }> = async () => ({
+    flags: {
+      "consumer.timelineV2": false,
+    },
+    ttlSeconds: 30,
+    generatedAtEpochMillis: 1_735_681_200_000,
+  }),
 ) {
   return {
     getOrderById,
+    getFeatureFlagSnapshot,
     oidcVerifier: createDevOidcVerifier(),
     sessionAuth: createAppSessionAuthService({
       jwtSecret: "fleetfeast-consumer-bff-test-secret",
@@ -156,6 +168,51 @@ test("consumer-bff serves consumer order details through adapter", async () => {
     const payload = (await response.json()) as { order: { id: string; status: string } };
     assert.equal(payload.order.id, "order-42");
     assert.equal(payload.order.status, "COURIER_ASSIGNED");
+  } finally {
+    await app.close();
+  }
+});
+
+test("consumer-bff returns feature-flag snapshot", async () => {
+  const app = createConsumerBffServer(
+    createTestConsumerDependencies(
+      async (orderId: string) => ({
+        id: orderId,
+        status: "COURIER_ASSIGNED",
+        timelineVersion: 3,
+      }),
+      async () => ({
+        flags: {
+          "consumer.timelineV2": true,
+          "consumer.cartRecommendations": false,
+        },
+        ttlSeconds: 75,
+        generatedAtEpochMillis: 1_735_681_201_000,
+      }),
+    ),
+  );
+  await app.listen({ port: 0, host: "127.0.0.1" });
+
+  try {
+    const address = app.server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind consumer-bff test listener");
+    }
+
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/app/v1/consumer/feature-flags?userId=consumer-1&role=consumer&tenantId=metro-1`,
+    );
+    assert.equal(response.status, 200);
+
+    const payload = (await response.json()) as {
+      flags: Record<string, boolean>;
+      ttlSeconds: number;
+      generatedAtEpochMillis: number;
+    };
+    assert.equal(payload.flags["consumer.timelineV2"], true);
+    assert.equal(payload.flags["consumer.cartRecommendations"], false);
+    assert.equal(payload.ttlSeconds, 75);
+    assert.equal(payload.generatedAtEpochMillis, 1_735_681_201_000);
   } finally {
     await app.close();
   }

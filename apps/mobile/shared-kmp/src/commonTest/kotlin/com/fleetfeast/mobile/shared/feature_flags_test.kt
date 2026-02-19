@@ -112,6 +112,34 @@ class FeatureFlagClientTest {
     assertEquals("courier", transport.lastRequestQuery["role"])
     assertEquals("fleet-9", transport.lastRequestQuery["tenantId"])
   }
+
+  @Test
+  fun consumer_bff_snapshot_source_fetches_flags_using_context_query() {
+    val transport = RecordingFeatureFlagTransport(
+      snapshot = FeatureFlagSnapshot(
+        flags = mapOf("consumer.timelineV2" to true),
+        ttlSeconds = 40,
+        generatedAtEpochMillis = 9_100,
+      ),
+    )
+    val source = ConsumerBffFeatureFlagSnapshotSource(
+      consumerClient = ConsumerBffClient(transport),
+    )
+
+    val snapshot = source.fetchSnapshot(
+      FeatureFlagContext(
+        userId = "consumer-7",
+        role = "consumer",
+        tenantId = "metro-7",
+      ),
+    )
+
+    assertEquals(true, snapshot.flags["consumer.timelineV2"])
+    assertEquals("/app/v1/consumer/feature-flags", transport.lastRequestPath)
+    assertEquals("consumer-7", transport.lastRequestQuery["userId"])
+    assertEquals("consumer", transport.lastRequestQuery["role"])
+    assertEquals("metro-7", transport.lastRequestQuery["tenantId"])
+  }
 }
 
 private class FakeClock(

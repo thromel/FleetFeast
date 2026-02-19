@@ -60,3 +60,11 @@ class CourierBffFeatureFlagSnapshotSource(
     return courierClient.getFeatureFlags(context)
   }
 }
+
+class ConsumerBffFeatureFlagSnapshotSource(
+  private val consumerClient: ConsumerBffClient,
+) : FeatureFlagSnapshotSource {
+  override fun fetchSnapshot(context: FeatureFlagContext): FeatureFlagSnapshot {
+    return consumerClient.getFeatureFlags(context)
+  }
+}

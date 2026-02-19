@@ -15,8 +15,21 @@ export interface ConsumerOrderView {
   timelineVersion: number;
 }
 
+export interface ConsumerFeatureFlagContext {
+  userId: string;
+  role: string;
+  tenantId?: string;
+}
+
+export interface ConsumerFeatureFlagSnapshot {
+  flags: Record<string, boolean>;
+  ttlSeconds: number;
+  generatedAtEpochMillis: number;
+}
+
 export interface ConsumerBffDependencies {
   getOrderById(orderId: string): Promise<ConsumerOrderView>;
+  getFeatureFlagSnapshot(context: ConsumerFeatureFlagContext): Promise<ConsumerFeatureFlagSnapshot>;
   oidcVerifier: OidcVerifier;
   sessionAuth: AppSessionAuthService;
 }
@@ -28,9 +41,11 @@ export interface ConsumerCoreApiDependencyOptions {
 
 export function createConsumerCoreApiDependencies(
   options: ConsumerCoreApiDependencyOptions,
-): Pick<ConsumerBffDependencies, "getOrderById"> {
+): Pick<ConsumerBffDependencies, "getOrderById" | "getFeatureFlagSnapshot"> {
   const baseUrl = options.coreApiBaseUrl.replace(/\/+$/, "");
   const fetchImpl = options.fetchImpl ?? fetch;
+  const configuredFlags = parseConsumerFeatureFlags(process.env.CONSUMER_FEATURE_FLAGS_JSON);
+  const ttlSeconds = parseFeatureFlagsTtlSeconds(process.env.CONSUMER_FEATURE_FLAGS_TTL_SECONDS);
 
   return {
     async getOrderById(orderId: string): Promise<ConsumerOrderView> {
@@ -51,6 +66,13 @@ export function createConsumerCoreApiDependencies(
         id: payload.id,
         status: payload.status,
         timelineVersion: typeof payload.timelineVersion === "number" ? payload.timelineVersion : 0,
+      };
+    },
+    async getFeatureFlagSnapshot(): Promise<ConsumerFeatureFlagSnapshot> {
+      return {
+        flags: configuredFlags,
+        ttlSeconds,
+        generatedAtEpochMillis: Date.now(),
       };
     },
   };
@@ -186,6 +208,36 @@ export function createConsumerBffServer(
     return { order };
   });
 
+  app.get("/app/v1/consumer/feature-flags", async (request, reply) => {
+    const query = request.query as { userId?: unknown; role?: unknown; tenantId?: unknown };
+    if (
+      typeof query?.userId !== "string" ||
+      query.userId.trim().length === 0 ||
+      typeof query?.role !== "string" ||
+      query.role.trim().length === 0
+    ) {
+      reply.status(400);
+      return {
+        errorCode: "INVALID_FEATURE_FLAG_QUERY",
+        message: "userId and role query params are required",
+      };
+    }
+
+    if (query.tenantId !== undefined && typeof query.tenantId !== "string") {
+      reply.status(400);
+      return {
+        errorCode: "INVALID_FEATURE_FLAG_QUERY",
+        message: "tenantId must be a string when provided",
+      };
+    }
+
+    return dependencies.getFeatureFlagSnapshot({
+      userId: query.userId,
+      role: query.role,
+      tenantId: query.tenantId,
+    });
+  });
+
   return app;
 }
 
@@ -197,4 +249,38 @@ export function createConsumerBffServerFromEnv(): FastifyInstance {
     oidcVerifier: createOidcVerifierFromEnv(process.env),
     sessionAuth: createAppSessionAuthServiceFromEnv(process.env),
   });
+}
+
+const DEFAULT_CONSUMER_FEATURE_FLAGS: Record<string, boolean> = {
+  "consumer.timelineV2": false,
+};
+
+function parseConsumerFeatureFlags(rawFlags: string | undefined): Record<string, boolean> {
+  if (!rawFlags) {
+    return { ...DEFAULT_CONSUMER_FEATURE_FLAGS };
+  }
+
+  try {
+    const parsed = JSON.parse(rawFlags) as Record<string, unknown>;
+    const flags: Record<string, boolean> = {};
+
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value === "boolean") {
+        flags[key] = value;
+      }
+    }
+
+    return Object.keys(flags).length > 0 ? flags : { ...DEFAULT_CONSUMER_FEATURE_FLAGS };
+  } catch {
+    return { ...DEFAULT_CONSUMER_FEATURE_FLAGS };
+  }
+}
+
+function parseFeatureFlagsTtlSeconds(rawTtlSeconds: string | undefined): number {
+  const parsed = Number.parseInt(rawTtlSeconds ?? "", 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 30;
+  }
+
+  return parsed;
 }

@@ -38,6 +38,27 @@ class ConsumerBffClient(
     )
     return requireBody<ConsumerOrderPayload>(response, endpoint).order
   }
+
+  fun getFeatureFlags(context: FeatureFlagContext): FeatureFlagSnapshot {
+    val endpoint = "$basePath/feature-flags"
+    val query = mutableMapOf(
+      "userId" to context.userId,
+      "role" to context.role,
+    )
+
+    if (context.tenantId != null) {
+      query["tenantId"] = context.tenantId
+    }
+
+    val response = transport.send(
+      BffRequest(
+        method = "GET",
+        path = endpoint,
+        query = query,
+      ),
+    )
+    return requireBody(response, endpoint)
+  }
 }
 
 class CourierBffClient(

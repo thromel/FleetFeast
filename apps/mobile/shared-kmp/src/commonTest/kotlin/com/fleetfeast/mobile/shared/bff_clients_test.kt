@@ -26,6 +26,17 @@ class BffClientTest {
           ),
         )
 
+        "/app/v1/consumer/feature-flags" -> BffResponse(
+          statusCode = 200,
+          body = FeatureFlagSnapshot(
+            flags = mapOf(
+              "consumer.timelineV2" to true,
+            ),
+            ttlSeconds = 90,
+            generatedAtEpochMillis = 1_735_681_300_000,
+          ),
+        )
+
         else -> BffResponse(statusCode = 404)
       }
     }
@@ -44,9 +55,23 @@ class BffClientTest {
     assertEquals("order-42", order.id)
     assertEquals("COURIER_ASSIGNED", order.status)
 
-    assertEquals(2, transport.requests.size)
+    val flags = client.getFeatureFlags(
+      FeatureFlagContext(
+        userId = "consumer-1",
+        role = "consumer",
+        tenantId = "metro-1",
+      ),
+    )
+    assertEquals(true, flags.flags["consumer.timelineV2"])
+
+    assertEquals(3, transport.requests.size)
     assertEquals("POST", transport.requests[0].method)
     assertEquals("GET", transport.requests[1].method)
+    assertEquals("GET", transport.requests[2].method)
+    assertEquals("/app/v1/consumer/feature-flags", transport.requests[2].path)
+    assertEquals("consumer-1", transport.requests[2].query["userId"])
+    assertEquals("consumer", transport.requests[2].query["role"])
+    assertEquals("metro-1", transport.requests[2].query["tenantId"])
   }
 
   @Test
