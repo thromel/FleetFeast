@@ -462,7 +462,7 @@ Last updated: `2026-02-19`
 | A02 Persona BFF services + realtime gateway skeleton | Done | `consumer-bff`, `courier-bff`, `ops-bff`, and `realtime-gateway` implemented with route-level tests |
 | A03 BFF-to-core backend connectivity | Done | Core API adapters implemented in all three BFFs with test coverage against backend HTTP stubs |
 | A04 App runtime bootstrap for BFF services | Done | `main.ts` entrypoints and `start` scripts added for local runtime |
-| A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js surfaces are live; mobile now includes tested `shared-kmp` contracts/offline queue + queue-store rehydration + JVM file-backed persistent store + typed BFF/realtime clients + feature-flag client baseline + HTTP transport adapter boundary + default JSON mapper + JVM HTTP executor + courier replay workflow service + consumer/courier/ops BFF-backed remote feature-flag snapshot support + startup bootstrap orchestrators + Swift Package iOS shell baselines with backend clients + Kotlin Android shell module baselines with backend clients + native iOS/Android app-session exchange/refresh client contracts + native auth-session manager layer for sign-in/refresh orchestration + shell-level factory wiring for backend/auth manager creation + web merchant/admin session exchange helpers with optional app-session token forwarding |
+| A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js surfaces are live; mobile now includes tested `shared-kmp` contracts/offline queue + queue-store rehydration + JVM file-backed persistent store + typed BFF/realtime clients + feature-flag client baseline + HTTP transport adapter boundary + default JSON mapper + JVM HTTP executor + courier replay workflow service + consumer/courier/ops BFF-backed remote feature-flag snapshot support + startup bootstrap orchestrators + Swift Package iOS shell baselines with backend clients + Kotlin Android shell module baselines with backend clients + native iOS/Android app-session exchange/refresh client contracts + native auth-session manager layer for sign-in/refresh orchestration + shell-level factory wiring for backend/auth manager creation + web merchant/admin session exchange helpers with optional app-session token forwarding + web merchant/admin session refresh helpers |
 | A06 OIDC+PKCE and app-session exchange hardening | Done | Added shared OIDC verifier (JWKS + dev fallback), persona-aware role checks, rotating refresh tokens, replay detection, and device-bound refresh validation across all BFFs |
 | A07 Push fallback (APNs/FCM) and full realtime fanout | Done | Added provider-specific APNs/FCM fallback adapters, internal publish endpoint with optional API-key guard, and full realtime gateway route/adapter test coverage |
 
@@ -470,6 +470,7 @@ Last updated: `2026-02-19`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
+| `46c56f3` | A05 | Added web merchant/admin session refresh helper APIs and tests for persona-scoped `/session/refresh` payload/response contracts |
 | `e03abb9` | A05 | Added web merchant/admin session exchange helpers and optional bearer-token forwarding for ops-bff data fetches; wired web pages to use env-driven app-session bootstrap |
 | `cc3dd6e` | A05 | Added shell-level factory APIs in iOS/Android consumer and courier modules to instantiate backend clients and auth-session managers from shell configuration with route-level tests |
 | `9c5a015` | A05 | Added native consumer/courier auth-session managers (iOS + Android) that persist active session state, orchestrate sign-in refresh flow, and enforce missing-session guards with coverage |
@@ -576,3 +577,6 @@ Last updated: `2026-02-19`
 24. Web ops-session auth readiness validation:
    - verifies `exchangeMerchantSession` and `exchangeAdminSession` POST persona-scoped session exchange payloads and return access-token values
    - verifies `fetchMerchantOrders` and `fetchAdminIncidents` forward optional bearer app-session tokens to ops-bff routes when configured
+25. Web ops-session refresh validation:
+   - verifies `refreshMerchantSession` and `refreshAdminSession` POST persona-scoped session refresh payloads and return refreshed access-token values
+   - verifies refresh helper coverage remains green within `npm run test:app-layer` workspace gates
