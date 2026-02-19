@@ -12,8 +12,9 @@ Current scope:
 6. HTTP transport adapter contract (`HttpBffTransport`) for URL/query/header/body mapping
 7. default JSON body mapper (`DefaultJsonHttpBodyMapper`) for app contract encode/decode
 8. JVM HTTP executor (`JvmHttpTransportExecutor`) for live BFF connectivity
-9. courier workflow service that combines feature flags with persistent offline replay
-10. JVM-testable baseline for iterative expansion into full iOS/Android clients
+9. JVM file-backed persistent store (`JvmJsonFileOfflineActionStore`) for durable offline queue state
+10. courier workflow service that combines feature flags with persistent offline replay
+11. JVM-testable baseline for iterative expansion into full iOS/Android clients
 
 ## Run Tests (Docker)
 
