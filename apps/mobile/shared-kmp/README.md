@@ -9,7 +9,8 @@ Current scope:
 3. typed BFF/realtime client adapters over an abstract transport (`BffTransport`)
 4. queue persistence abstraction (`OfflineActionStore`) with restart rehydration semantics
 5. feature flag client with snapshot TTL caching semantics
-6. JVM-testable baseline for iterative expansion into full iOS/Android clients
+6. HTTP transport adapter contract (`HttpBffTransport`) for URL/query/header/body mapping
+7. JVM-testable baseline for iterative expansion into full iOS/Android clients
 
 ## Run Tests (Docker)
 

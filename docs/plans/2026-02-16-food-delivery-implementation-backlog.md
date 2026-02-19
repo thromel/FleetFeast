@@ -462,7 +462,7 @@ Last updated: `2026-02-18`
 | A02 Persona BFF services + realtime gateway skeleton | Done | `consumer-bff`, `courier-bff`, `ops-bff`, and `realtime-gateway` implemented with route-level tests |
 | A03 BFF-to-core backend connectivity | Done | Core API adapters implemented in all three BFFs with test coverage against backend HTTP stubs |
 | A04 App runtime bootstrap for BFF services | Done | `main.ts` entrypoints and `start` scripts added for local runtime |
-| A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js surfaces are live; mobile now includes tested `shared-kmp` contracts/offline queue + typed BFF/realtime clients + queue-store rehydration + feature-flag client baseline and iOS/Android shell directories |
+| A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js surfaces are live; mobile now includes tested `shared-kmp` contracts/offline queue + typed BFF/realtime clients + queue-store rehydration + feature-flag client baseline + HTTP transport adapter boundary and iOS/Android shell directories |
 | A06 OIDC+PKCE and app-session exchange hardening | Done | Added shared OIDC verifier (JWKS + dev fallback), persona-aware role checks, rotating refresh tokens, replay detection, and device-bound refresh validation across all BFFs |
 | A07 Push fallback (APNs/FCM) and full realtime fanout | Done | Added provider-specific APNs/FCM fallback adapters, internal publish endpoint with optional API-key guard, and full realtime gateway route/adapter test coverage |
 
@@ -470,6 +470,7 @@ Last updated: `2026-02-18`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
+| `uncommitted` | A05 | Added `HttpBffTransport` adapter and HTTP transport contracts so typed mobile clients can run against mocked HTTP interfaces |
 | `daf8c60` | A05 | Added `shared-kmp` feature-flag client with TTL cache/refresh semantics and deterministic Docker KMP test execution |
 | `7a2299f` | A05 | Added persistent offline-queue store abstraction (`OfflineActionStore`) and rehydration tests; hardened Docker KMP test command |
 | `819efea` | A05 | Added typed `shared-kmp` BFF/realtime clients over abstract transport with Kotlin tests for route/payload mapping |
@@ -515,3 +516,6 @@ Last updated: `2026-02-18`
 10. Mobile feature-flag client validation:
    - verifies TTL-bound cached snapshot reuse
    - verifies refresh behavior after TTL expiry and force-refresh override
+11. Mobile HTTP transport adapter validation:
+   - verifies URL/query encoding and request header/body mapping
+   - verifies consumer typed client behavior over HTTP transport contract path

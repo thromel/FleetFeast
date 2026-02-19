@@ -21,7 +21,7 @@ Current implemented slice:
 4. OIDC-backed app-session exchange with rotating refresh tokens in BFF layer
 5. push fallback with provider-specific APNs/FCM adapters in realtime gateway
 6. internal realtime publish endpoint for channel fanout (`/app/v1/realtime/publish`)
-7. mobile scaffold with `apps/mobile/shared-kmp` (contracts + offline queue + typed BFF/realtime clients + queue-store rehydration + feature-flag caching client) and native shell directories for iOS/Android
+7. mobile scaffold with `apps/mobile/shared-kmp` (contracts + offline queue + typed BFF/realtime clients + queue-store rehydration + feature-flag caching client + HTTP transport adapter boundary) and native shell directories for iOS/Android
 
 ## 2. Topology
 
@@ -58,6 +58,7 @@ Current implemented slice:
 4. Realtime gateway receives domain-aligned events and publishes to channel subscribers.
 5. When no websocket subscriber exists for a channel, realtime gateway sends push fallback via provider adapters.
 6. Mobile clients consume BFF/realtime through typed `shared-kmp` adapters over an abstract transport boundary (`BffTransport`).
+7. `shared-kmp` includes an HTTP transport adapter (`HttpBffTransport`) that converts typed requests into URL/query/header/body HTTP calls through injectable executor/mapper interfaces.
 
 Current concrete adapter mappings:
 
@@ -132,6 +133,6 @@ Implemented quality gates in this slice:
 ## 7. Remaining Work To Full V1
 
 1. full native mobile project wiring (Compose/SwiftUI app projects + build pipelines)
-2. shared-kmp expansion: production-grade persistence implementation (e.g., SQLDelight) and remote feature-flag source integration
+2. shared-kmp expansion: production-grade persistence implementation (e.g., SQLDelight), remote feature-flag source integration, and platform HTTP executor/JSON mapper implementations
 3. backend event-bus to realtime-gateway publish integration hardening
 4. e2e journey gates across all four surfaces
