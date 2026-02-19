@@ -187,6 +187,27 @@ class OpsBffClient(
     return requireBody<MerchantOrdersPayload>(response, endpoint).orders
   }
 
+  fun getMerchantFeatureFlags(context: FeatureFlagContext): FeatureFlagSnapshot {
+    val endpoint = "$merchantBasePath/feature-flags"
+    val query = mutableMapOf(
+      "userId" to context.userId,
+      "role" to context.role,
+    )
+
+    if (context.tenantId != null) {
+      query["tenantId"] = context.tenantId
+    }
+
+    val response = transport.send(
+      BffRequest(
+        method = "GET",
+        path = endpoint,
+        query = query,
+      ),
+    )
+    return requireBody(response, endpoint)
+  }
+
   fun listAdminIncidents(): List<AdminIncidentView> {
     val endpoint = "$adminBasePath/incidents"
     val response = transport.send(
@@ -196,6 +217,27 @@ class OpsBffClient(
       ),
     )
     return requireBody<AdminIncidentsPayload>(response, endpoint).incidents
+  }
+
+  fun getAdminFeatureFlags(context: FeatureFlagContext): FeatureFlagSnapshot {
+    val endpoint = "$adminBasePath/feature-flags"
+    val query = mutableMapOf(
+      "userId" to context.userId,
+      "role" to context.role,
+    )
+
+    if (context.tenantId != null) {
+      query["tenantId"] = context.tenantId
+    }
+
+    val response = transport.send(
+      BffRequest(
+        method = "GET",
+        path = endpoint,
+        query = query,
+      ),
+    )
+    return requireBody(response, endpoint)
   }
 }
 

@@ -156,6 +156,24 @@ class BffClientTest {
           ),
         )
 
+        "/app/v1/merchant/feature-flags" -> BffResponse(
+          statusCode = 200,
+          body = FeatureFlagSnapshot(
+            flags = mapOf("merchant.livePrepBoard" to true),
+            ttlSeconds = 45,
+            generatedAtEpochMillis = 1_735_681_700_000,
+          ),
+        )
+
+        "/app/v1/admin/feature-flags" -> BffResponse(
+          statusCode = 200,
+          body = FeatureFlagSnapshot(
+            flags = mapOf("admin.incidentWorkbenchV2" to false),
+            ttlSeconds = 45,
+            generatedAtEpochMillis = 1_735_681_700_000,
+          ),
+        )
+
         "/app/v1/admin/session/exchange" -> BffResponse(
           statusCode = 200,
           body = fakeSessionExchangeResponse(persona = "admin", role = "system_admin"),
@@ -173,6 +191,28 @@ class BffClientTest {
 
     val incidents = client.listAdminIncidents()
     assertEquals("trace-incident-1", incidents.single().id)
+
+    val merchantFlags = client.getMerchantFeatureFlags(
+      FeatureFlagContext(
+        userId = "merchant-1",
+        role = "merchant_operator",
+        tenantId = "metro-1",
+      ),
+    )
+    assertEquals(true, merchantFlags.flags["merchant.livePrepBoard"])
+    assertEquals("merchant-1", transport.requests[2].query["userId"])
+    assertEquals("merchant_operator", transport.requests[2].query["role"])
+
+    val adminFlags = client.getAdminFeatureFlags(
+      FeatureFlagContext(
+        userId = "admin-1",
+        role = "system_admin",
+        tenantId = "metro-1",
+      ),
+    )
+    assertEquals(false, adminFlags.flags["admin.incidentWorkbenchV2"])
+    assertEquals("admin-1", transport.requests[3].query["userId"])
+    assertEquals("system_admin", transport.requests[3].query["role"])
 
     val session = client.exchangeAdminSession(
       AppSessionExchangeRequest(

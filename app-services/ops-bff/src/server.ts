@@ -20,9 +20,23 @@ export interface AdminIncidentView {
   severity: string;
 }
 
+export interface OpsFeatureFlagContext {
+  userId: string;
+  role: string;
+  tenantId?: string;
+}
+
+export interface OpsFeatureFlagSnapshot {
+  flags: Record<string, boolean>;
+  ttlSeconds: number;
+  generatedAtEpochMillis: number;
+}
+
 export interface OpsBffDependencies {
   listMerchantOrders(merchantId: string): Promise<MerchantOrderView[]>;
   listAdminIncidents(): Promise<AdminIncidentView[]>;
+  getMerchantFeatureFlagSnapshot(context: OpsFeatureFlagContext): Promise<OpsFeatureFlagSnapshot>;
+  getAdminFeatureFlagSnapshot(context: OpsFeatureFlagContext): Promise<OpsFeatureFlagSnapshot>;
   oidcVerifier: OidcVerifier;
   sessionAuth: AppSessionAuthService;
 }
@@ -34,9 +48,19 @@ export interface OpsCoreApiDependencyOptions {
 
 export function createOpsCoreApiDependencies(
   options: OpsCoreApiDependencyOptions,
-): Pick<OpsBffDependencies, "listMerchantOrders" | "listAdminIncidents"> {
+): Pick<
+  OpsBffDependencies,
+  "listMerchantOrders" | "listAdminIncidents" | "getMerchantFeatureFlagSnapshot" | "getAdminFeatureFlagSnapshot"
+> {
   const baseUrl = options.coreApiBaseUrl.replace(/\/+$/, "");
   const fetchImpl = options.fetchImpl ?? fetch;
+  const merchantFlags = parseFeatureFlagMap(process.env.MERCHANT_FEATURE_FLAGS_JSON, {
+    "merchant.livePrepBoard": true,
+  });
+  const adminFlags = parseFeatureFlagMap(process.env.ADMIN_FEATURE_FLAGS_JSON, {
+    "admin.incidentWorkbenchV2": false,
+  });
+  const ttlSeconds = parseFeatureFlagsTtlSeconds(process.env.OPS_FEATURE_FLAGS_TTL_SECONDS);
 
   return {
     async listMerchantOrders(merchantId: string): Promise<MerchantOrderView[]> {
@@ -70,6 +94,20 @@ export function createOpsCoreApiDependencies(
         id: log.traceId,
         severity: log.statusCode >= 500 ? "HIGH" : "LOW",
       }));
+    },
+    async getMerchantFeatureFlagSnapshot(): Promise<OpsFeatureFlagSnapshot> {
+      return {
+        flags: merchantFlags,
+        ttlSeconds,
+        generatedAtEpochMillis: Date.now(),
+      };
+    },
+    async getAdminFeatureFlagSnapshot(): Promise<OpsFeatureFlagSnapshot> {
+      return {
+        flags: adminFlags,
+        ttlSeconds,
+        generatedAtEpochMillis: Date.now(),
+      };
     },
   };
 }
@@ -325,9 +363,69 @@ export function createOpsBffServer(dependencies: OpsBffDependencies): FastifyIns
     return { orders };
   });
 
+  app.get("/app/v1/merchant/feature-flags", async (request, reply) => {
+    const query = request.query as { userId?: unknown; role?: unknown; tenantId?: unknown };
+    if (
+      typeof query?.userId !== "string" ||
+      query.userId.trim().length === 0 ||
+      typeof query?.role !== "string" ||
+      query.role.trim().length === 0
+    ) {
+      reply.status(400);
+      return {
+        errorCode: "INVALID_FEATURE_FLAG_QUERY",
+        message: "userId and role query params are required",
+      };
+    }
+
+    if (query.tenantId !== undefined && typeof query.tenantId !== "string") {
+      reply.status(400);
+      return {
+        errorCode: "INVALID_FEATURE_FLAG_QUERY",
+        message: "tenantId must be a string when provided",
+      };
+    }
+
+    return dependencies.getMerchantFeatureFlagSnapshot({
+      userId: query.userId,
+      role: query.role,
+      tenantId: query.tenantId,
+    });
+  });
+
   app.get("/app/v1/admin/incidents", async () => {
     const incidents = await dependencies.listAdminIncidents();
     return { incidents };
+  });
+
+  app.get("/app/v1/admin/feature-flags", async (request, reply) => {
+    const query = request.query as { userId?: unknown; role?: unknown; tenantId?: unknown };
+    if (
+      typeof query?.userId !== "string" ||
+      query.userId.trim().length === 0 ||
+      typeof query?.role !== "string" ||
+      query.role.trim().length === 0
+    ) {
+      reply.status(400);
+      return {
+        errorCode: "INVALID_FEATURE_FLAG_QUERY",
+        message: "userId and role query params are required",
+      };
+    }
+
+    if (query.tenantId !== undefined && typeof query.tenantId !== "string") {
+      reply.status(400);
+      return {
+        errorCode: "INVALID_FEATURE_FLAG_QUERY",
+        message: "tenantId must be a string when provided",
+      };
+    }
+
+    return dependencies.getAdminFeatureFlagSnapshot({
+      userId: query.userId,
+      role: query.role,
+      tenantId: query.tenantId,
+    });
   });
 
   return app;
@@ -341,4 +439,36 @@ export function createOpsBffServerFromEnv(): FastifyInstance {
     oidcVerifier: createOidcVerifierFromEnv(process.env),
     sessionAuth: createAppSessionAuthServiceFromEnv(process.env),
   });
+}
+
+function parseFeatureFlagMap(
+  rawFlags: string | undefined,
+  defaultFlags: Record<string, boolean>,
+): Record<string, boolean> {
+  if (!rawFlags) {
+    return { ...defaultFlags };
+  }
+
+  try {
+    const parsed = JSON.parse(rawFlags) as Record<string, unknown>;
+    const flags: Record<string, boolean> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value === "boolean") {
+        flags[key] = value;
+      }
+    }
+
+    return Object.keys(flags).length > 0 ? flags : { ...defaultFlags };
+  } catch {
+    return { ...defaultFlags };
+  }
+}
+
+function parseFeatureFlagsTtlSeconds(rawTtlSeconds: string | undefined): number {
+  const parsed = Number.parseInt(rawTtlSeconds ?? "", 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 30;
+  }
+
+  return parsed;
 }

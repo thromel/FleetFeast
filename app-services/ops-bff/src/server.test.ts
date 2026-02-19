@@ -10,6 +10,20 @@ function createTestOpsDependencies() {
   return {
     listMerchantOrders: async () => [{ id: "order-1", status: "MERCHANT_ACCEPTED" }],
     listAdminIncidents: async () => [{ id: "incident-1", severity: "HIGH" }],
+    getMerchantFeatureFlagSnapshot: async () => ({
+      flags: {
+        "merchant.livePrepBoard": true,
+      },
+      ttlSeconds: 30,
+      generatedAtEpochMillis: 1_735_681_600_000,
+    }),
+    getAdminFeatureFlagSnapshot: async () => ({
+      flags: {
+        "admin.incidentWorkbenchV2": false,
+      },
+      ttlSeconds: 30,
+      generatedAtEpochMillis: 1_735_681_600_000,
+    }),
     oidcVerifier: createDevOidcVerifier(),
     sessionAuth: createAppSessionAuthService({
       jwtSecret: "fleetfeast-ops-bff-test-secret",
@@ -154,6 +168,44 @@ test("ops-bff serves merchant orders and admin incidents", async () => {
       incidents: Array<{ id: string }>;
     };
     assert.equal(adminPayload.incidents[0]?.id, "incident-1");
+  } finally {
+    await app.close();
+  }
+});
+
+test("ops-bff returns merchant and admin feature-flag snapshots", async () => {
+  const app = createOpsBffServer(createTestOpsDependencies());
+  await app.listen({ port: 0, host: "127.0.0.1" });
+
+  try {
+    const address = app.server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind ops-bff test listener");
+    }
+
+    const merchantResponse = await fetch(
+      `http://127.0.0.1:${address.port}/app/v1/merchant/feature-flags?userId=merchant-1&role=merchant_operator&tenantId=metro-1`,
+    );
+    assert.equal(merchantResponse.status, 200);
+    const merchantPayload = (await merchantResponse.json()) as {
+      flags: Record<string, boolean>;
+      ttlSeconds: number;
+      generatedAtEpochMillis: number;
+    };
+    assert.equal(merchantPayload.flags["merchant.livePrepBoard"], true);
+    assert.equal(merchantPayload.ttlSeconds, 30);
+
+    const adminResponse = await fetch(
+      `http://127.0.0.1:${address.port}/app/v1/admin/feature-flags?userId=admin-1&role=system_admin&tenantId=metro-1`,
+    );
+    assert.equal(adminResponse.status, 200);
+    const adminPayload = (await adminResponse.json()) as {
+      flags: Record<string, boolean>;
+      ttlSeconds: number;
+      generatedAtEpochMillis: number;
+    };
+    assert.equal(adminPayload.flags["admin.incidentWorkbenchV2"], false);
+    assert.equal(adminPayload.ttlSeconds, 30);
   } finally {
     await app.close();
   }
