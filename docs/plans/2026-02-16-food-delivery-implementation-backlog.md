@@ -462,7 +462,7 @@ Last updated: `2026-02-19`
 | A02 Persona BFF services + realtime gateway skeleton | Done | `consumer-bff`, `courier-bff`, `ops-bff`, and `realtime-gateway` implemented with route-level tests |
 | A03 BFF-to-core backend connectivity | Done | Core API adapters implemented in all three BFFs with test coverage against backend HTTP stubs |
 | A04 App runtime bootstrap for BFF services | Done | `main.ts` entrypoints and `start` scripts added for local runtime |
-| A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js surfaces are live; mobile now includes tested `shared-kmp` contracts/offline queue + queue-store rehydration + JVM file-backed persistent store + typed BFF/realtime clients + feature-flag client baseline + HTTP transport adapter boundary + default JSON mapper + JVM HTTP executor + courier replay workflow service + consumer/courier/ops BFF-backed remote feature-flag snapshot support + startup bootstrap orchestrators + Swift Package iOS shell baselines with backend clients + Kotlin Android shell module baselines with backend clients + native iOS/Android app-session exchange client contracts |
+| A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js surfaces are live; mobile now includes tested `shared-kmp` contracts/offline queue + queue-store rehydration + JVM file-backed persistent store + typed BFF/realtime clients + feature-flag client baseline + HTTP transport adapter boundary + default JSON mapper + JVM HTTP executor + courier replay workflow service + consumer/courier/ops BFF-backed remote feature-flag snapshot support + startup bootstrap orchestrators + Swift Package iOS shell baselines with backend clients + Kotlin Android shell module baselines with backend clients + native iOS/Android app-session exchange/refresh client contracts |
 | A06 OIDC+PKCE and app-session exchange hardening | Done | Added shared OIDC verifier (JWKS + dev fallback), persona-aware role checks, rotating refresh tokens, replay detection, and device-bound refresh validation across all BFFs |
 | A07 Push fallback (APNs/FCM) and full realtime fanout | Done | Added provider-specific APNs/FCM fallback adapters, internal publish endpoint with optional API-key guard, and full realtime gateway route/adapter test coverage |
 
@@ -470,6 +470,7 @@ Last updated: `2026-02-19`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
+| `0badde7` | A05 | Added native consumer/courier iOS and Android session-refresh clients with POST contract tests for method, payload, and typed response decoding |
 | `5437e4d` | A05 | Added native consumer/courier iOS and Android session-exchange clients with POST contract tests for method, payload, and typed response decoding |
 | `5fcfa87` | A05 | Added backend connectivity clients for consumer/courier iOS and Android shell modules with tested path/query mapping and typed payload decoding |
 | `8afede4` | A05 | Added tested Kotlin Android shell modules for consumer/courier plus root `test:mobile-android-shells` command for Gradle-based validation |
@@ -560,3 +561,6 @@ Last updated: `2026-02-19`
 20. Native app-session exchange client validation:
    - verifies consumer/courier iOS backend clients POST `/app/v1/{persona}/session/exchange` with OIDC payload and decode typed token/session response
    - verifies consumer/courier Android backend clients POST `/app/v1/{persona}/session/exchange` with OIDC payload and decode typed token/session response
+21. Native app-session refresh client validation:
+   - verifies consumer/courier iOS backend clients POST `/app/v1/{persona}/session/refresh` with refresh payload and decode typed token/session response
+   - verifies consumer/courier Android backend clients POST `/app/v1/{persona}/session/refresh` with refresh payload and decode typed token/session response
