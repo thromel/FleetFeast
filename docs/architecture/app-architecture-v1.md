@@ -21,7 +21,7 @@ Current implemented slice:
 4. OIDC-backed app-session exchange with rotating refresh tokens in BFF layer
 5. push fallback with provider-specific APNs/FCM adapters in realtime gateway
 6. internal realtime publish endpoint for channel fanout (`/app/v1/realtime/publish`)
-7. mobile scaffold with `apps/mobile/shared-kmp` (contracts + offline queue + typed BFF/realtime clients + queue-store rehydration + feature-flag caching client + HTTP transport adapter boundary) and native shell directories for iOS/Android
+7. mobile scaffold with `apps/mobile/shared-kmp` (contracts + offline queue + typed BFF/realtime clients + queue-store rehydration + feature-flag caching client + HTTP transport adapter boundary + courier replay workflow service) and native shell directories for iOS/Android
 
 ## 2. Topology
 

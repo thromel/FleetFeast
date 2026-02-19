@@ -10,7 +10,8 @@ Current scope:
 4. queue persistence abstraction (`OfflineActionStore`) with restart rehydration semantics
 5. feature flag client with snapshot TTL caching semantics
 6. HTTP transport adapter contract (`HttpBffTransport`) for URL/query/header/body mapping
-7. JVM-testable baseline for iterative expansion into full iOS/Android clients
+7. courier workflow service that combines feature flags with persistent offline replay
+8. JVM-testable baseline for iterative expansion into full iOS/Android clients
 
 ## Run Tests (Docker)
 
