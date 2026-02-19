@@ -73,6 +73,12 @@ private struct ConsumerSessionExchangeRequest: Encodable {
     let deviceId: String
 }
 
+private struct ConsumerSessionRefreshRequest: Encodable {
+    let refreshToken: String
+    let traceId: String
+    let deviceId: String
+}
+
 public struct ConsumerBackendClient {
     private let baseURL: URL
     private let httpClient: HTTPClient
@@ -121,6 +127,23 @@ public struct ConsumerBackendClient {
         )
         let data = try await performPOST(
             path: "/app/v1/consumer/session/exchange",
+            body: try encoder.encode(requestBody)
+        )
+        return try decoder.decode(SessionExchangeResponse.self, from: data)
+    }
+
+    public func refreshSession(
+        refreshToken: String,
+        traceId: String,
+        deviceId: String
+    ) async throws -> SessionExchangeResponse {
+        let requestBody = ConsumerSessionRefreshRequest(
+            refreshToken: refreshToken,
+            traceId: traceId,
+            deviceId: deviceId
+        )
+        let data = try await performPOST(
+            path: "/app/v1/consumer/session/refresh",
             body: try encoder.encode(requestBody)
         )
         return try decoder.decode(SessionExchangeResponse.self, from: data)

@@ -68,6 +68,31 @@ struct ConsumerBackendClientTests {
         #expect(recorder.lastMethod == "POST")
         #expect(recorder.lastBody?.contains("\"oidcToken\":\"dev:consumer-1:user@fleetfeast.dev:consumer\"") == true)
     }
+
+    @Test
+    func refreshSessionPostsToSessionRefreshPath() async throws {
+        let recorder = RecordingHTTPClient(
+            responsesByPath: [
+                "/app/v1/consumer/session/refresh": ("{\"session\":{\"sessionId\":\"session-2\",\"userId\":\"consumer-1\",\"role\":\"consumer\",\"persona\":\"consumer\",\"traceId\":\"trace-2\",\"refreshTokenId\":\"rt-2\",\"issuedAt\":\"2026-02-19T01:00:00Z\",\"expiresAt\":\"2026-02-19T02:00:00Z\"},\"tokenPair\":{\"tokenType\":\"Bearer\",\"accessToken\":\"access-2\",\"refreshToken\":\"refresh-2\",\"expiresInSeconds\":3600,\"refreshExpiresInSeconds\":2592000,\"refreshExpiresAt\":\"2026-03-21T01:00:00Z\"}}", 200)
+            ]
+        )
+        let client = ConsumerBackendClient(
+            baseURL: URL(string: "http://127.0.0.1:4101")!,
+            httpClient: recorder
+        )
+
+        let response = try await client.refreshSession(
+            refreshToken: "refresh-1",
+            traceId: "trace-2",
+            deviceId: "device-1"
+        )
+
+        #expect(response.session.traceId == "trace-2")
+        #expect(response.tokenPair.accessToken == "access-2")
+        #expect(recorder.lastPath == "/app/v1/consumer/session/refresh")
+        #expect(recorder.lastMethod == "POST")
+        #expect(recorder.lastBody?.contains("\"refreshToken\":\"refresh-1\"") == true)
+    }
 }
 
 private final class RecordingHTTPClient: HTTPClient {

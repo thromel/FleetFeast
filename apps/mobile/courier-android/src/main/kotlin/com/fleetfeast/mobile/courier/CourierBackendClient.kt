@@ -107,6 +107,13 @@ private data class CourierSessionExchangeRequest(
   val deviceId: String,
 )
 
+@Serializable
+private data class CourierSessionRefreshRequest(
+  val refreshToken: String,
+  val traceId: String,
+  val deviceId: String,
+)
+
 class CourierBackendClient(
   private val baseUrl: String,
   private val transport: HttpTransport = UrlConnectionHttpTransport(),
@@ -159,6 +166,23 @@ class CourierBackendClient(
     )
     val response = executePost(
       path = "/app/v1/courier/session/exchange",
+      body = json.encodeToString(requestBody),
+    )
+    return json.decodeFromString(response.body ?: "{}")
+  }
+
+  fun refreshSession(
+    refreshToken: String,
+    traceId: String,
+    deviceId: String,
+  ): SessionExchangeResponse {
+    val requestBody = CourierSessionRefreshRequest(
+      refreshToken = refreshToken,
+      traceId = traceId,
+      deviceId = deviceId,
+    )
+    val response = executePost(
+      path = "/app/v1/courier/session/refresh",
       body = json.encodeToString(requestBody),
     )
     return json.decodeFromString(response.body ?: "{}")

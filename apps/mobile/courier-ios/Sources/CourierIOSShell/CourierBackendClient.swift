@@ -73,6 +73,12 @@ private struct CourierSessionExchangeRequest: Encodable {
     let deviceId: String
 }
 
+private struct CourierSessionRefreshRequest: Encodable {
+    let refreshToken: String
+    let traceId: String
+    let deviceId: String
+}
+
 public struct CourierBackendClient {
     private let baseURL: URL
     private let httpClient: HTTPClient
@@ -121,6 +127,23 @@ public struct CourierBackendClient {
         )
         let data = try await performPOST(
             path: "/app/v1/courier/session/exchange",
+            body: try encoder.encode(requestBody)
+        )
+        return try decoder.decode(SessionExchangeResponse.self, from: data)
+    }
+
+    public func refreshSession(
+        refreshToken: String,
+        traceId: String,
+        deviceId: String
+    ) async throws -> SessionExchangeResponse {
+        let requestBody = CourierSessionRefreshRequest(
+            refreshToken: refreshToken,
+            traceId: traceId,
+            deviceId: deviceId
+        )
+        let data = try await performPOST(
+            path: "/app/v1/courier/session/refresh",
             body: try encoder.encode(requestBody)
         )
         return try decoder.decode(SessionExchangeResponse.self, from: data)

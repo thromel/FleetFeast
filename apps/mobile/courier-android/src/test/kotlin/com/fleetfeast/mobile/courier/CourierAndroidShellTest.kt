@@ -105,6 +105,34 @@ class CourierAndroidShellTest {
     assertEquals("POST", transport.methods[0])
     assertTrue(transport.bodies[0].contains("\"oidcToken\":\"dev:courier-1:courier@fleetfeast.dev:courier\""))
   }
+
+  @Test
+  fun backend_client_refreshes_session_with_post_request() {
+    val transport = RecordingTransport(
+      responsesByPath = mapOf(
+        "/app/v1/courier/session/refresh" to HttpTransportResponse(
+          statusCode = 200,
+          body = "{\"session\":{\"sessionId\":\"session-2\",\"userId\":\"courier-1\",\"role\":\"courier\",\"persona\":\"courier\",\"traceId\":\"trace-2\",\"refreshTokenId\":\"rt-2\",\"issuedAt\":\"2026-02-19T01:00:00Z\",\"expiresAt\":\"2026-02-19T02:00:00Z\"},\"tokenPair\":{\"tokenType\":\"Bearer\",\"accessToken\":\"access-2\",\"refreshToken\":\"refresh-2\",\"expiresInSeconds\":3600,\"refreshExpiresInSeconds\":2592000,\"refreshExpiresAt\":\"2026-03-21T01:00:00Z\"}}",
+        ),
+      ),
+    )
+    val client = CourierBackendClient(
+      baseUrl = "http://127.0.0.1:4102",
+      transport = transport,
+    )
+
+    val response = client.refreshSession(
+      refreshToken = "refresh-1",
+      traceId = "trace-2",
+      deviceId = "device-1",
+    )
+
+    assertEquals("trace-2", response.session.traceId)
+    assertEquals("access-2", response.tokenPair.accessToken)
+    assertEquals("/app/v1/courier/session/refresh", transport.paths[0])
+    assertEquals("POST", transport.methods[0])
+    assertTrue(transport.bodies[0].contains("\"refreshToken\":\"refresh-1\""))
+  }
 }
 
 private class RecordingTransport(
