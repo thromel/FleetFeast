@@ -122,6 +122,59 @@ class ConsumerAndroidShellTest {
     assertEquals("POST", transport.methods[0])
     assertTrue(transport.bodies[0].contains("\"refreshToken\":\"refresh-1\""))
   }
+
+  @Test
+  fun auth_session_manager_sign_in_and_refresh_uses_stored_refresh_token() {
+    val transport = RecordingTransport(
+      responsesByPath = mapOf(
+        "/app/v1/consumer/session/exchange" to HttpTransportResponse(
+          statusCode = 200,
+          body = "{\"session\":{\"sessionId\":\"session-1\",\"userId\":\"consumer-1\",\"role\":\"consumer\",\"persona\":\"consumer\",\"traceId\":\"trace-1\",\"refreshTokenId\":\"rt-1\",\"issuedAt\":\"2026-02-19T00:00:00Z\",\"expiresAt\":\"2026-02-19T01:00:00Z\"},\"tokenPair\":{\"tokenType\":\"Bearer\",\"accessToken\":\"access-1\",\"refreshToken\":\"refresh-1\",\"expiresInSeconds\":3600,\"refreshExpiresInSeconds\":2592000,\"refreshExpiresAt\":\"2026-03-21T00:00:00Z\"}}",
+        ),
+        "/app/v1/consumer/session/refresh" to HttpTransportResponse(
+          statusCode = 200,
+          body = "{\"session\":{\"sessionId\":\"session-2\",\"userId\":\"consumer-1\",\"role\":\"consumer\",\"persona\":\"consumer\",\"traceId\":\"trace-2\",\"refreshTokenId\":\"rt-2\",\"issuedAt\":\"2026-02-19T01:00:00Z\",\"expiresAt\":\"2026-02-19T02:00:00Z\"},\"tokenPair\":{\"tokenType\":\"Bearer\",\"accessToken\":\"access-2\",\"refreshToken\":\"refresh-2\",\"expiresInSeconds\":3600,\"refreshExpiresInSeconds\":2592000,\"refreshExpiresAt\":\"2026-03-21T01:00:00Z\"}}",
+        ),
+      ),
+    )
+    val client = ConsumerBackendClient(
+      baseUrl = "http://127.0.0.1:4101",
+      transport = transport,
+    )
+    val manager = ConsumerAuthSessionManager(client)
+
+    val signIn = manager.signIn(
+      oidcToken = "dev:consumer-1:user@fleetfeast.dev:consumer",
+      traceId = "trace-1",
+      deviceId = "device-1",
+    )
+    val refresh = manager.refresh(
+      traceId = "trace-2",
+      deviceId = "device-1",
+    )
+
+    assertEquals("access-1", signIn.tokenPair.accessToken)
+    assertEquals("access-2", refresh.tokenPair.accessToken)
+    assertEquals("refresh-2", manager.currentSession()?.tokenPair?.refreshToken)
+    assertEquals("/app/v1/consumer/session/exchange", transport.paths[0])
+    assertEquals("/app/v1/consumer/session/refresh", transport.paths[1])
+    assertTrue(transport.bodies[1].contains("\"refreshToken\":\"refresh-1\""))
+  }
+
+  @Test
+  fun auth_session_manager_refresh_requires_existing_session() {
+    val client = ConsumerBackendClient(
+      baseUrl = "http://127.0.0.1:4101",
+      transport = RecordingTransport(responsesByPath = emptyMap()),
+    )
+    val manager = ConsumerAuthSessionManager(client)
+
+    val error = assertFailsWith<IllegalStateException> {
+      manager.refresh(traceId = "trace-1", deviceId = "device-1")
+    }
+
+    assertTrue(error.message?.contains("No active session") == true)
+  }
 }
 
 private class RecordingTransport(
