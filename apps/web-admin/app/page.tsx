@@ -1,7 +1,16 @@
-import { fetchAdminIncidents } from "../src/lib/api";
+import { exchangeAdminSession, fetchAdminIncidents } from "../src/lib/api";
 
 export default async function AdminPage() {
-  const incidents = await fetchAdminIncidents();
+  const appSessionToken =
+    process.env.WEB_ADMIN_APP_SESSION_TOKEN ??
+    (process.env.WEB_ADMIN_OIDC_TOKEN
+      ? await exchangeAdminSession({
+          oidcToken: process.env.WEB_ADMIN_OIDC_TOKEN,
+          traceId: `web-admin-${Date.now()}`,
+          deviceId: "web-admin",
+        })
+      : undefined);
+  const incidents = await fetchAdminIncidents({ appSessionToken });
 
   return (
     <main className="shell">

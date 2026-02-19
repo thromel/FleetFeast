@@ -5,7 +5,14 @@ export interface AdminIncidentView {
 
 export interface AdminApiOptions {
   opsBffBaseUrl?: string;
+  appSessionToken?: string;
   fetchImpl?: typeof fetch;
+}
+
+export interface AdminSessionExchangeRequest {
+  oidcToken: string;
+  traceId: string;
+  deviceId?: string;
 }
 
 function resolveOpsBffBaseUrl(options?: AdminApiOptions): string {
@@ -22,8 +29,12 @@ export async function fetchAdminIncidents(
 ): Promise<AdminIncidentView[]> {
   const fetchImpl = options?.fetchImpl ?? fetch;
   const baseUrl = resolveOpsBffBaseUrl(options);
+  const headers = options?.appSessionToken
+    ? { authorization: `Bearer ${options.appSessionToken}` }
+    : undefined;
   const response = await fetchImpl(`${baseUrl}/app/v1/admin/incidents`, {
     cache: "no-store",
+    headers,
   });
 
   if (!response.ok) {
@@ -38,4 +49,32 @@ export async function fetchAdminIncidents(
     id: incident.id,
     severity: incident.severity,
   }));
+}
+
+export async function exchangeAdminSession(
+  request: AdminSessionExchangeRequest,
+  options?: AdminApiOptions,
+): Promise<string> {
+  const fetchImpl = options?.fetchImpl ?? fetch;
+  const baseUrl = resolveOpsBffBaseUrl(options);
+  const response = await fetchImpl(`${baseUrl}/app/v1/admin/session/exchange`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("OPS_BFF_ADMIN_SESSION_EXCHANGE_FAILED");
+  }
+
+  const payload = (await response.json()) as {
+    tokenPair?: { accessToken?: unknown };
+  };
+  const accessToken = payload.tokenPair?.accessToken;
+  if (typeof accessToken !== "string" || accessToken.length === 0) {
+    throw new Error("OPS_BFF_ADMIN_SESSION_EXCHANGE_INVALID_PAYLOAD");
+  }
+
+  return accessToken;
 }
