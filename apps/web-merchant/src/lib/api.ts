@@ -15,6 +15,12 @@ export interface MerchantSessionExchangeRequest {
   deviceId?: string;
 }
 
+export interface MerchantSessionRefreshRequest {
+  refreshToken: string;
+  traceId: string;
+  deviceId?: string;
+}
+
 function resolveOpsBffBaseUrl(options?: MerchantApiOptions): string {
   const candidate =
     options?.opsBffBaseUrl ??
@@ -78,6 +84,34 @@ export async function exchangeMerchantSession(
   const accessToken = payload.tokenPair?.accessToken;
   if (typeof accessToken !== "string" || accessToken.length === 0) {
     throw new Error("OPS_BFF_MERCHANT_SESSION_EXCHANGE_INVALID_PAYLOAD");
+  }
+
+  return accessToken;
+}
+
+export async function refreshMerchantSession(
+  request: MerchantSessionRefreshRequest,
+  options?: MerchantApiOptions,
+): Promise<string> {
+  const fetchImpl = options?.fetchImpl ?? fetch;
+  const baseUrl = resolveOpsBffBaseUrl(options);
+  const response = await fetchImpl(`${baseUrl}/app/v1/merchant/session/refresh`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("OPS_BFF_MERCHANT_SESSION_REFRESH_FAILED");
+  }
+
+  const payload = (await response.json()) as {
+    tokenPair?: { accessToken?: unknown };
+  };
+  const accessToken = payload.tokenPair?.accessToken;
+  if (typeof accessToken !== "string" || accessToken.length === 0) {
+    throw new Error("OPS_BFF_MERCHANT_SESSION_REFRESH_INVALID_PAYLOAD");
   }
 
   return accessToken;

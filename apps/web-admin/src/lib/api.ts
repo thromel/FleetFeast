@@ -15,6 +15,12 @@ export interface AdminSessionExchangeRequest {
   deviceId?: string;
 }
 
+export interface AdminSessionRefreshRequest {
+  refreshToken: string;
+  traceId: string;
+  deviceId?: string;
+}
+
 function resolveOpsBffBaseUrl(options?: AdminApiOptions): string {
   const candidate =
     options?.opsBffBaseUrl ??
@@ -74,6 +80,34 @@ export async function exchangeAdminSession(
   const accessToken = payload.tokenPair?.accessToken;
   if (typeof accessToken !== "string" || accessToken.length === 0) {
     throw new Error("OPS_BFF_ADMIN_SESSION_EXCHANGE_INVALID_PAYLOAD");
+  }
+
+  return accessToken;
+}
+
+export async function refreshAdminSession(
+  request: AdminSessionRefreshRequest,
+  options?: AdminApiOptions,
+): Promise<string> {
+  const fetchImpl = options?.fetchImpl ?? fetch;
+  const baseUrl = resolveOpsBffBaseUrl(options);
+  const response = await fetchImpl(`${baseUrl}/app/v1/admin/session/refresh`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("OPS_BFF_ADMIN_SESSION_REFRESH_FAILED");
+  }
+
+  const payload = (await response.json()) as {
+    tokenPair?: { accessToken?: unknown };
+  };
+  const accessToken = payload.tokenPair?.accessToken;
+  if (typeof accessToken !== "string" || accessToken.length === 0) {
+    throw new Error("OPS_BFF_ADMIN_SESSION_REFRESH_INVALID_PAYLOAD");
   }
 
   return accessToken;
