@@ -33,6 +33,31 @@ public struct FeatureFlagSnapshot: Decodable {
     public let generatedAtEpochMillis: Int64
 }
 
+public struct AppSession: Decodable {
+    public let sessionId: String
+    public let userId: String
+    public let role: String
+    public let persona: String
+    public let traceId: String
+    public let refreshTokenId: String
+    public let issuedAt: String
+    public let expiresAt: String
+}
+
+public struct AppSessionTokenPair: Decodable {
+    public let tokenType: String
+    public let accessToken: String
+    public let refreshToken: String
+    public let expiresInSeconds: Int
+    public let refreshExpiresInSeconds: Int
+    public let refreshExpiresAt: String
+}
+
+public struct SessionExchangeResponse: Decodable {
+    public let session: AppSession
+    public let tokenPair: AppSessionTokenPair
+}
+
 public enum CourierBackendClientError: Error {
     case invalidResponse
     case requestFailed(statusCode: Int)
@@ -42,10 +67,17 @@ private struct CourierJobsEnvelope: Decodable {
     let jobs: [CourierJob]
 }
 
+private struct CourierSessionExchangeRequest: Encodable {
+    let oidcToken: String
+    let traceId: String
+    let deviceId: String
+}
+
 public struct CourierBackendClient {
     private let baseURL: URL
     private let httpClient: HTTPClient
     private let decoder = JSONDecoder()
+    private let encoder = JSONEncoder()
 
     public init(baseURL: URL, httpClient: HTTPClient = URLSessionHTTPClient()) {
         self.baseURL = baseURL
@@ -77,9 +109,52 @@ public struct CourierBackendClient {
         return try decoder.decode(FeatureFlagSnapshot.self, from: data)
     }
 
+    public func exchangeSession(
+        oidcToken: String,
+        traceId: String,
+        deviceId: String
+    ) async throws -> SessionExchangeResponse {
+        let requestBody = CourierSessionExchangeRequest(
+            oidcToken: oidcToken,
+            traceId: traceId,
+            deviceId: deviceId
+        )
+        let data = try await performPOST(
+            path: "/app/v1/courier/session/exchange",
+            body: try encoder.encode(requestBody)
+        )
+        return try decoder.decode(SessionExchangeResponse.self, from: data)
+    }
+
     private func performGET(
         path: String,
         queryItems: [URLQueryItem] = []
+    ) async throws -> Data {
+        try await performRequest(
+            method: "GET",
+            path: path,
+            queryItems: queryItems
+        )
+    }
+
+    private func performPOST(
+        path: String,
+        body: Data
+    ) async throws -> Data {
+        try await performRequest(
+            method: "POST",
+            path: path,
+            body: body,
+            contentType: "application/json"
+        )
+    }
+
+    private func performRequest(
+        method: String,
+        path: String,
+        queryItems: [URLQueryItem] = [],
+        body: Data? = nil,
+        contentType: String? = nil
     ) async throws -> Data {
         let base = baseURL.absoluteString.replacingOccurrences(of: "/$", with: "", options: .regularExpression)
         var components = URLComponents(string: "\(base)\(path)")
@@ -90,7 +165,11 @@ public struct CourierBackendClient {
         }
 
         var request = URLRequest(url: finalURL)
-        request.httpMethod = "GET"
+        request.httpMethod = method
+        if let contentType {
+            request.setValue(contentType, forHTTPHeaderField: "content-type")
+        }
+        request.httpBody = body
 
         let (data, response) = try await httpClient.request(request)
         guard (200...299).contains(response.statusCode) else {
