@@ -11,6 +11,7 @@
     "build:app-layer": "npm run build --workspaces --if-present",
     "test:app-layer": "npm run test --workspaces --if-present",
     "test:mobile-shared-kmp": "docker run --rm --user 0:0 -v \"$PWD\":/workspace -w /workspace/apps/mobile/shared-kmp gradle:8.10-jdk17 gradle -Dorg.gradle.project.buildDir=/tmp/fleetfeast-kmp-build jvmTest --no-daemon",
+    "test:mobile-android-shells": "docker run --rm --user 0:0 -v \"$PWD\":/workspace -w /workspace/apps/mobile/consumer-android gradle:8.10-jdk17 gradle -Dorg.gradle.project.buildDir=/tmp/fleetfeast-consumer-android-build test --no-daemon && docker run --rm --user 0:0 -v \"$PWD\":/workspace -w /workspace/apps/mobile/courier-android gradle:8.10-jdk17 gradle -Dorg.gradle.project.buildDir=/tmp/fleetfeast-courier-android-build test --no-daemon",
     "test:mobile-ios-shells": "cd apps/mobile/consumer-ios && swift test && cd ../courier-ios && swift test",
     "dev:web-stack": "node scripts/dev-web-stack.mjs"
   },

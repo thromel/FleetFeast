@@ -1,10 +1,16 @@
 # Courier Android Shell
 
-Native Android shell placeholder for FleetFeast courier app.
+Kotlin module baseline for FleetFeast courier Android shell.
 
-Planned stack:
+Current scope:
 
-1. Jetpack Compose + MVI screen architecture
-2. shared-kmp for offline action queue and contracts
-3. realtime subscriptions through `/app/v1/realtime/connect`
-4. push fallback registration through `/app/v1/realtime/push/register`
+1. typed shell config validation for BFF and realtime base URLs
+2. startup summary and route helpers for jobs, feature flags, and realtime connect
+3. Gradle-based unit tests for shell config and path generation
+
+Run tests:
+
+```bash
+cd apps/mobile/courier-android
+gradle test
+```

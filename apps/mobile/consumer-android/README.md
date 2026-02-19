@@ -1,10 +1,16 @@
 # Consumer Android Shell
 
-Native Android shell placeholder for FleetFeast consumer app.
+Kotlin module baseline for FleetFeast consumer Android shell.
 
-Planned stack:
+Current scope:
 
-1. Jetpack Compose UI
-2. Navigation Compose flow graph
-3. shared-kmp core for contracts/offline state
-4. BFF integration through `/app/v1/consumer/*`
+1. typed shell config validation for BFF base URL
+2. startup summary and route helpers for consumer order + feature-flag paths
+3. Gradle-based unit tests for shell config and path generation
+
+Run tests:
+
+```bash
+cd apps/mobile/consumer-android
+gradle test
+```
