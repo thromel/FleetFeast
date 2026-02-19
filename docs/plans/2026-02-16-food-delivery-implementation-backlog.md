@@ -462,7 +462,7 @@ Last updated: `2026-02-19`
 | A02 Persona BFF services + realtime gateway skeleton | Done | `consumer-bff`, `courier-bff`, `ops-bff`, and `realtime-gateway` implemented with route-level tests |
 | A03 BFF-to-core backend connectivity | Done | Core API adapters implemented in all three BFFs with test coverage against backend HTTP stubs |
 | A04 App runtime bootstrap for BFF services | Done | `main.ts` entrypoints and `start` scripts added for local runtime |
-| A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js surfaces are live; mobile now includes tested `shared-kmp` contracts/offline queue + queue-store rehydration + JVM file-backed persistent store + typed BFF/realtime clients + feature-flag client baseline + HTTP transport adapter boundary + default JSON mapper + JVM HTTP executor + courier replay workflow service + consumer/courier/ops BFF-backed remote feature-flag snapshot support and iOS/Android shell directories |
+| A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js surfaces are live; mobile now includes tested `shared-kmp` contracts/offline queue + queue-store rehydration + JVM file-backed persistent store + typed BFF/realtime clients + feature-flag client baseline + HTTP transport adapter boundary + default JSON mapper + JVM HTTP executor + courier replay workflow service + consumer/courier/ops BFF-backed remote feature-flag snapshot support + startup bootstrap orchestrators and iOS/Android shell directories |
 | A06 OIDC+PKCE and app-session exchange hardening | Done | Added shared OIDC verifier (JWKS + dev fallback), persona-aware role checks, rotating refresh tokens, replay detection, and device-bound refresh validation across all BFFs |
 | A07 Push fallback (APNs/FCM) and full realtime fanout | Done | Added provider-specific APNs/FCM fallback adapters, internal publish endpoint with optional API-key guard, and full realtime gateway route/adapter test coverage |
 
@@ -470,6 +470,7 @@ Last updated: `2026-02-19`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
+| `8e8bc87` | A05 | Added shared-kmp startup bootstrap orchestrators for consumer/courier/ops persona hydration (session + initial data + feature flags) with Kotlin tests |
 | `f4f1e6f` | A05 | Added `JvmJsonFileOfflineActionStore` with JVM tests for durable offline queue persistence and restart rehydration |
 | `c5ee528` | A05 | Added `/app/v1/merchant/feature-flags` and `/app/v1/admin/feature-flags` routes in ops-bff plus shared-kmp ops client integration for remote ops feature-flag retrieval |
 | `6693614` | A05 | Added `/app/v1/consumer/feature-flags` route in consumer-bff plus shared-kmp client/source integration for remote consumer feature-flag snapshot retrieval |
@@ -539,3 +540,7 @@ Last updated: `2026-02-19`
 15. JVM file-backed persistence validation:
    - verifies `JvmJsonFileOfflineActionStore` returns empty when no store file exists
    - verifies JSON round-trip persistence and queue rehydration across `PersistentOfflineActionQueue` instances
+16. Shared-kmp startup bootstrap validation:
+   - verifies consumer bootstrap performs session exchange and feature-flag hydration
+   - verifies courier bootstrap performs session exchange, available jobs load, and feature-flag hydration
+   - verifies ops bootstrap performs merchant/admin session exchange and corresponding initial view hydration

@@ -21,7 +21,7 @@ Current implemented slice:
 4. OIDC-backed app-session exchange with rotating refresh tokens in BFF layer
 5. push fallback with provider-specific APNs/FCM adapters in realtime gateway
 6. internal realtime publish endpoint for channel fanout (`/app/v1/realtime/publish`)
-7. mobile scaffold with `apps/mobile/shared-kmp` (contracts + offline queue + queue-store rehydration + JVM file-backed persistent store + typed BFF/realtime clients + feature-flag caching client + HTTP transport adapter boundary + default JSON body mapper + JVM HTTP executor + courier replay workflow service + persona-wide remote feature-flag snapshot support) and native shell directories for iOS/Android
+7. mobile scaffold with `apps/mobile/shared-kmp` (contracts + offline queue + queue-store rehydration + JVM file-backed persistent store + typed BFF/realtime clients + feature-flag caching client + HTTP transport adapter boundary + default JSON body mapper + JVM HTTP executor + courier replay workflow service + persona-wide remote feature-flag snapshot support + persona startup bootstrap orchestrators) and native shell directories for iOS/Android
 
 ## 2. Topology
 
@@ -70,6 +70,7 @@ Current implemented slice:
 9. consumer/courier shared-kmp flow now supports remote feature flag snapshots via `ConsumerBffClient.getFeatureFlags`/`CourierBffClient.getFeatureFlags` and corresponding snapshot source adapters.
 10. ops shared-kmp flow now supports remote feature flag snapshots via `OpsBffClient.getMerchantFeatureFlags` and `OpsBffClient.getAdminFeatureFlags`.
 11. shared-kmp now includes `JvmJsonFileOfflineActionStore` for durable offline queue persistence in local JVM flows.
+12. shared-kmp bootstrap orchestrators (`ConsumerAppBootstrap`, `CourierAppBootstrap`, `OpsAppBootstrap`) provide startup hydration flows for session + initial data.
 
 Current concrete adapter mappings:
 
@@ -147,6 +148,7 @@ Implemented quality gates in this slice:
 8. shared-kmp JVM integration tests for JSON mapping and live HTTP round-trip using `JvmHttpTransportExecutor`
 9. consumer/courier/ops feature-flag integration tests across BFF routes and shared-kmp client query mapping/source adapters
 10. shared-kmp JVM file-store tests for empty-state load, JSON round-trip persistence, and queue rehydration via `PersistentOfflineActionQueue`
+11. shared-kmp app-bootstrap tests validating ordered startup hydration for consumer, courier, merchant, and admin personas
 
 ## 7. Remaining Work To Full V1
 
