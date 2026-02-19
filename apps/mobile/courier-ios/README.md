@@ -6,7 +6,8 @@ Current scope:
 
 1. typed shell config validation for BFF + realtime base URLs
 2. startup summary and route helpers for jobs, feature flags, and realtime connect path
-3. package-level unit tests for shell config and path generation
+3. backend connectivity client (`CourierBackendClient`) for jobs + feature-flag calls
+4. package-level unit tests for shell config, path generation, and backend client request mapping
 
 Run tests:
 

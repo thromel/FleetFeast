@@ -21,7 +21,7 @@ Current implemented slice:
 4. OIDC-backed app-session exchange with rotating refresh tokens in BFF layer
 5. push fallback with provider-specific APNs/FCM adapters in realtime gateway
 6. internal realtime publish endpoint for channel fanout (`/app/v1/realtime/publish`)
-7. mobile scaffold with `apps/mobile/shared-kmp` (contracts + offline queue + queue-store rehydration + JVM file-backed persistent store + typed BFF/realtime clients + feature-flag caching client + HTTP transport adapter boundary + default JSON body mapper + JVM HTTP executor + courier replay workflow service + persona-wide remote feature-flag snapshot support + persona startup bootstrap orchestrators), Kotlin Android shell modules, and Swift Package iOS shells
+7. mobile scaffold with `apps/mobile/shared-kmp` (contracts + offline queue + queue-store rehydration + JVM file-backed persistent store + typed BFF/realtime clients + feature-flag caching client + HTTP transport adapter boundary + default JSON body mapper + JVM HTTP executor + courier replay workflow service + persona-wide remote feature-flag snapshot support + persona startup bootstrap orchestrators), Kotlin Android shell modules with backend clients, and Swift Package iOS shells with backend clients
 
 ## 2. Topology
 
@@ -71,6 +71,7 @@ Current implemented slice:
 10. ops shared-kmp flow now supports remote feature flag snapshots via `OpsBffClient.getMerchantFeatureFlags` and `OpsBffClient.getAdminFeatureFlags`.
 11. shared-kmp now includes `JvmJsonFileOfflineActionStore` for durable offline queue persistence in local JVM flows.
 12. shared-kmp bootstrap orchestrators (`ConsumerAppBootstrap`, `CourierAppBootstrap`, `OpsAppBootstrap`) provide startup hydration flows for session + initial data.
+13. native shell modules now include persona backend clients (`ConsumerBackendClient`, `CourierBackendClient`) for order/jobs and feature-flag REST calls with explicit request mapping tests.
 
 Current concrete adapter mappings:
 
@@ -151,6 +152,7 @@ Implemented quality gates in this slice:
 11. shared-kmp app-bootstrap tests validating ordered startup hydration for consumer, courier, merchant, and admin personas
 12. iOS shell package tests via `npm run test:mobile-ios-shells` (`swift test` for consumer and courier modules)
 13. Android shell module tests via `npm run test:mobile-android-shells` (Gradle `test` in consumer/courier modules)
+14. native shell backend-client tests covering REST path/query mapping and typed payload decode for consumer/courier iOS and Android modules
 
 ## 7. Remaining Work To Full V1
 
