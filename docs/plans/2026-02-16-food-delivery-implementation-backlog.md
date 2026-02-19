@@ -470,7 +470,7 @@ Last updated: `2026-02-18`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
-| `uncommitted` | A05 | Added `CourierWorkflowService` tying feature flags to persistent offline action replay and retry semantics |
+| `a340636` | A05 | Added `CourierWorkflowService` tying feature flags to persistent offline action replay and retry semantics |
 | `3a51aad` | A05 | Added `HttpBffTransport` adapter and HTTP transport contracts so typed mobile clients can run against mocked HTTP interfaces |
 | `daf8c60` | A05 | Added `shared-kmp` feature-flag client with TTL cache/refresh semantics and deterministic Docker KMP test execution |
 | `7a2299f` | A05 | Added persistent offline-queue store abstraction (`OfflineActionStore`) and rehydration tests; hardened Docker KMP test command |
