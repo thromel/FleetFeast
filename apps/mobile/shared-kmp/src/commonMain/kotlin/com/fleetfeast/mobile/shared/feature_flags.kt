@@ -52,3 +52,11 @@ class FeatureFlagClient(
     return listOf(context.userId, context.role, context.tenantId ?: "-").joinToString("|")
   }
 }
+
+class CourierBffFeatureFlagSnapshotSource(
+  private val courierClient: CourierBffClient,
+) : FeatureFlagSnapshotSource {
+  override fun fetchSnapshot(context: FeatureFlagContext): FeatureFlagSnapshot {
+    return courierClient.getFeatureFlags(context)
+  }
+}

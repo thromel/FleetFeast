@@ -50,6 +50,7 @@ class DefaultJsonHttpBodyMapper(
       normalizedPath == "/app/v1/admin/session/refresh" -> json.decodeFromString<AppSessionExchangeResponse>(body)
       normalizedPath.startsWith("/app/v1/consumer/orders/") -> json.decodeFromString<ConsumerOrderPayload>(body)
       normalizedPath == "/app/v1/courier/jobs/available" -> json.decodeFromString<CourierJobsPayload>(body)
+      normalizedPath == "/app/v1/courier/feature-flags" -> json.decodeFromString<FeatureFlagSnapshot>(body)
       normalizedPath == "/app/v1/merchant/orders" -> json.decodeFromString<MerchantOrdersPayload>(body)
       normalizedPath == "/app/v1/admin/incidents" -> json.decodeFromString<AdminIncidentsPayload>(body)
       normalizedPath == "/app/v1/realtime/push/register" -> json.decodeFromString<RealtimePushRegistrationResponse>(body)

@@ -3,9 +3,16 @@ import { createServer as createHttpServer } from "node:http";
 import test from "node:test";
 import { createAppSessionAuthService, createDevOidcVerifier } from "@fleetfeast/app-auth";
 import { createCourierBffServer, createCourierCoreApiDependencies } from "./server.js";
-function createTestCourierDependencies(listAvailableJobs) {
+function createTestCourierDependencies(listAvailableJobs, getFeatureFlagSnapshot = async () => ({
+    flags: {
+        "courier.offlineReplay": true,
+    },
+    ttlSeconds: 30,
+    generatedAtEpochMillis: 1_735_680_900_000,
+})) {
     return {
         listAvailableJobs,
+        getFeatureFlagSnapshot,
         oidcVerifier: createDevOidcVerifier(),
         sessionAuth: createAppSessionAuthService({
             jwtSecret: "fleetfeast-courier-bff-test-secret",
@@ -95,6 +102,33 @@ test("courier-bff returns available jobs", async () => {
         const payload = (await response.json());
         assert.equal(payload.jobs.length, 1);
         assert.equal(payload.jobs[0]?.jobId, "job-1");
+    }
+    finally {
+        await app.close();
+    }
+});
+test("courier-bff returns feature-flag snapshot", async () => {
+    const app = createCourierBffServer(createTestCourierDependencies(async () => [], async () => ({
+        flags: {
+            "courier.offlineReplay": true,
+            "courier.routeBatching": false,
+        },
+        ttlSeconds: 60,
+        generatedAtEpochMillis: 1_735_680_901_000,
+    })));
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    try {
+        const address = app.server.address();
+        if (!address || typeof address === "string") {
+            throw new Error("Failed to bind courier-bff test listener");
+        }
+        const response = await fetch(`http://127.0.0.1:${address.port}/app/v1/courier/feature-flags?userId=courier-1&role=courier&tenantId=fleet-1`);
+        assert.equal(response.status, 200);
+        const payload = (await response.json());
+        assert.equal(payload.flags["courier.offlineReplay"], true);
+        assert.equal(payload.flags["courier.routeBatching"], false);
+        assert.equal(payload.ttlSeconds, 60);
+        assert.equal(payload.generatedAtEpochMillis, 1_735_680_901_000);
     }
     finally {
         await app.close();

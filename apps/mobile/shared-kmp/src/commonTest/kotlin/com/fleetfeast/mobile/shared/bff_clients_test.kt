@@ -66,16 +66,41 @@ class BffClientTest {
           ),
         )
 
+        "/app/v1/courier/feature-flags" -> BffResponse(
+          statusCode = 200,
+          body = FeatureFlagSnapshot(
+            flags = mapOf(
+              "courier.offlineReplay" to true,
+              "courier.newBatching" to false,
+            ),
+            ttlSeconds = 45,
+            generatedAtEpochMillis = 1_735_680_100_000,
+          ),
+        )
+
         else -> BffResponse(statusCode = 404)
       }
     }
 
     val client = CourierBffClient(transport)
     val jobs = client.listAvailableJobs()
+    val featureFlags = client.getFeatureFlags(
+      FeatureFlagContext(
+        userId = "courier-1",
+        role = "courier",
+        tenantId = "fleet-1",
+      ),
+    )
 
     assertEquals(1, jobs.size)
     assertEquals("job-1", jobs[0].jobId)
-    assertEquals("/app/v1/courier/jobs/available", transport.requests.single().path)
+    assertEquals(true, featureFlags.flags["courier.offlineReplay"])
+    assertEquals(45, featureFlags.ttlSeconds)
+    assertEquals("/app/v1/courier/jobs/available", transport.requests[0].path)
+    assertEquals("/app/v1/courier/feature-flags", transport.requests[1].path)
+    assertEquals("courier-1", transport.requests[1].query["userId"])
+    assertEquals("courier", transport.requests[1].query["role"])
+    assertEquals("fleet-1", transport.requests[1].query["tenantId"])
   }
 
   @Test

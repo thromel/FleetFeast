@@ -84,6 +84,34 @@ class FeatureFlagClientTest {
     assertTrue(client.isEnabled("ops.bulkActions", context, forceRefresh = true))
     assertEquals(2, source.fetchCount)
   }
+
+  @Test
+  fun courier_bff_snapshot_source_fetches_flags_using_context_query() {
+    val transport = RecordingFeatureFlagTransport(
+      snapshot = FeatureFlagSnapshot(
+        flags = mapOf("courier.offlineReplay" to true),
+        ttlSeconds = 30,
+        generatedAtEpochMillis = 9_000,
+      ),
+    )
+    val source = CourierBffFeatureFlagSnapshotSource(
+      courierClient = CourierBffClient(transport),
+    )
+
+    val snapshot = source.fetchSnapshot(
+      FeatureFlagContext(
+        userId = "courier-9",
+        role = "courier",
+        tenantId = "fleet-9",
+      ),
+    )
+
+    assertEquals(true, snapshot.flags["courier.offlineReplay"])
+    assertEquals("/app/v1/courier/feature-flags", transport.lastRequestPath)
+    assertEquals("courier-9", transport.lastRequestQuery["userId"])
+    assertEquals("courier", transport.lastRequestQuery["role"])
+    assertEquals("fleet-9", transport.lastRequestQuery["tenantId"])
+  }
 }
 
 private class FakeClock(
@@ -107,6 +135,25 @@ private class FakeFlagSource(
       flags = emptyMap(),
       ttlSeconds = 30,
       generatedAtEpochMillis = 0,
+    )
+  }
+}
+
+private class RecordingFeatureFlagTransport(
+  private val snapshot: FeatureFlagSnapshot,
+) : BffTransport {
+  var lastRequestPath: String = ""
+    private set
+  var lastRequestQuery: Map<String, String> = emptyMap()
+    private set
+
+  override fun send(request: BffRequest): BffResponse {
+    lastRequestPath = request.path
+    lastRequestQuery = request.query
+
+    return BffResponse(
+      statusCode = 200,
+      body = snapshot,
     )
   }
 }

@@ -3,6 +3,8 @@ import { createAppSessionAuthServiceFromEnv, createOidcVerifierFromEnv, extractR
 export function createCourierCoreApiDependencies(options) {
     const baseUrl = options.coreApiBaseUrl.replace(/\/+$/, "");
     const fetchImpl = options.fetchImpl ?? fetch;
+    const configuredFlags = parseCourierFeatureFlags(process.env.COURIER_FEATURE_FLAGS_JSON);
+    const ttlSeconds = parseFeatureFlagsTtlSeconds(process.env.COURIER_FEATURE_FLAGS_TTL_SECONDS);
     return {
         async listAvailableJobs() {
             const response = await fetchImpl(`${baseUrl}/api/v1/courier/jobs/available`);
@@ -15,6 +17,13 @@ export function createCourierCoreApiDependencies(options) {
                 orderId: job.orderId,
                 status: job.status,
             }));
+        },
+        async getFeatureFlagSnapshot() {
+            return {
+                flags: configuredFlags,
+                ttlSeconds,
+                generatedAtEpochMillis: Date.now(),
+            };
         },
     };
 }
@@ -113,6 +122,31 @@ export function createCourierBffServer(dependencies) {
         const jobs = await dependencies.listAvailableJobs();
         return { jobs };
     });
+    app.get("/app/v1/courier/feature-flags", async (request, reply) => {
+        const query = request.query;
+        if (typeof query?.userId !== "string" ||
+            query.userId.trim().length === 0 ||
+            typeof query?.role !== "string" ||
+            query.role.trim().length === 0) {
+            reply.status(400);
+            return {
+                errorCode: "INVALID_FEATURE_FLAG_QUERY",
+                message: "userId and role query params are required",
+            };
+        }
+        if (query.tenantId !== undefined && typeof query.tenantId !== "string") {
+            reply.status(400);
+            return {
+                errorCode: "INVALID_FEATURE_FLAG_QUERY",
+                message: "tenantId must be a string when provided",
+            };
+        }
+        return dependencies.getFeatureFlagSnapshot({
+            userId: query.userId,
+            role: query.role,
+            tenantId: query.tenantId,
+        });
+    });
     return app;
 }
 export function createCourierBffServerFromEnv() {
@@ -123,5 +157,33 @@ export function createCourierBffServerFromEnv() {
         oidcVerifier: createOidcVerifierFromEnv(process.env),
         sessionAuth: createAppSessionAuthServiceFromEnv(process.env),
     });
+}
+const DEFAULT_COURIER_FEATURE_FLAGS = {
+    "courier.offlineReplay": true,
+};
+function parseCourierFeatureFlags(rawFlags) {
+    if (!rawFlags) {
+        return { ...DEFAULT_COURIER_FEATURE_FLAGS };
+    }
+    try {
+        const parsed = JSON.parse(rawFlags);
+        const flags = {};
+        for (const [key, value] of Object.entries(parsed)) {
+            if (typeof value === "boolean") {
+                flags[key] = value;
+            }
+        }
+        return Object.keys(flags).length > 0 ? flags : { ...DEFAULT_COURIER_FEATURE_FLAGS };
+    }
+    catch {
+        return { ...DEFAULT_COURIER_FEATURE_FLAGS };
+    }
+}
+function parseFeatureFlagsTtlSeconds(rawTtlSeconds) {
+    const parsed = Number.parseInt(rawTtlSeconds ?? "", 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        return 30;
+    }
+    return parsed;
 }
 //# sourceMappingURL=server.js.map
