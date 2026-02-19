@@ -41,4 +41,54 @@ class CourierAndroidShellTest {
       )
     }
   }
+
+  @Test
+  fun backend_client_fetches_jobs_and_feature_flags() {
+    val transport = RecordingTransport(
+      responsesByPath = mapOf(
+        "/app/v1/courier/jobs/available" to HttpTransportResponse(
+          statusCode = 200,
+          body = "{\"jobs\":[{\"jobId\":\"job-1\",\"orderId\":\"order-1\",\"status\":\"AVAILABLE\"}]}",
+        ),
+        "/app/v1/courier/feature-flags" to HttpTransportResponse(
+          statusCode = 200,
+          body = "{\"flags\":{\"courier.offlineReplay\":true},\"ttlSeconds\":30,\"generatedAtEpochMillis\":1735684000000}",
+        ),
+      ),
+    )
+    val client = CourierBackendClient(
+      baseUrl = "http://127.0.0.1:4102",
+      transport = transport,
+    )
+
+    val jobs = client.fetchAvailableJobs()
+    val flags = client.fetchFeatureFlags(
+      userId = "courier-1",
+      role = "courier",
+      tenantId = "metro-1",
+    )
+
+    assertEquals(1, jobs.size)
+    assertEquals("job-1", jobs[0].jobId)
+    assertEquals(true, flags.flags["courier.offlineReplay"])
+    assertEquals("/app/v1/courier/jobs/available", transport.paths[0])
+    assertEquals("/app/v1/courier/feature-flags", transport.paths[1])
+    assertTrue(transport.queries[1].contains("userId=courier-1"))
+    assertTrue(transport.queries[1].contains("role=courier"))
+    assertTrue(transport.queries[1].contains("tenantId=metro-1"))
+  }
+}
+
+private class RecordingTransport(
+  private val responsesByPath: Map<String, HttpTransportResponse>,
+) : HttpTransport {
+  val paths = mutableListOf<String>()
+  val queries = mutableListOf<String>()
+
+  override fun execute(request: HttpTransportRequest): HttpTransportResponse {
+    val url = java.net.URI.create(request.url)
+    paths.add(url.path)
+    queries.add(url.query ?: "")
+    return responsesByPath[url.path] ?: HttpTransportResponse(404, "{}")
+  }
 }

@@ -31,4 +31,53 @@ class ConsumerAndroidShellTest {
       ConsumerAndroidShell("invalid-url")
     }
   }
+
+  @Test
+  fun backend_client_fetches_order_and_feature_flags() {
+    val transport = RecordingTransport(
+      responsesByPath = mapOf(
+        "/app/v1/consumer/orders/order-7" to HttpTransportResponse(
+          statusCode = 200,
+          body = "{\"order\":{\"id\":\"order-7\",\"status\":\"COURIER_ASSIGNED\",\"timelineVersion\":4}}",
+        ),
+        "/app/v1/consumer/feature-flags" to HttpTransportResponse(
+          statusCode = 200,
+          body = "{\"flags\":{\"consumer.timelineV2\":true},\"ttlSeconds\":30,\"generatedAtEpochMillis\":1735684000000}",
+        ),
+      ),
+    )
+    val client = ConsumerBackendClient(
+      baseUrl = "http://127.0.0.1:4101",
+      transport = transport,
+    )
+
+    val order = client.fetchOrder("order-7")
+    val flags = client.fetchFeatureFlags(
+      userId = "consumer-1",
+      role = "consumer",
+      tenantId = "metro-1",
+    )
+
+    assertEquals("order-7", order.id)
+    assertEquals(true, flags.flags["consumer.timelineV2"])
+    assertEquals("/app/v1/consumer/orders/order-7", transport.paths[0])
+    assertEquals("/app/v1/consumer/feature-flags", transport.paths[1])
+    assertTrue(transport.queries[1].contains("userId=consumer-1"))
+    assertTrue(transport.queries[1].contains("role=consumer"))
+    assertTrue(transport.queries[1].contains("tenantId=metro-1"))
+  }
+}
+
+private class RecordingTransport(
+  private val responsesByPath: Map<String, HttpTransportResponse>,
+) : HttpTransport {
+  val paths = mutableListOf<String>()
+  val queries = mutableListOf<String>()
+
+  override fun execute(request: HttpTransportRequest): HttpTransportResponse {
+    val url = java.net.URI.create(request.url)
+    paths.add(url.path)
+    queries.add(url.query ?: "")
+    return responsesByPath[url.path] ?: HttpTransportResponse(404, "{}")
+  }
 }
