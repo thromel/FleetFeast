@@ -1,6 +1,6 @@
 # App Architecture V1 (FleetFeast)
 
-Last updated: `2026-02-18`
+Last updated: `2026-02-19`
 
 ## 1. Scope
 
@@ -21,7 +21,7 @@ Current implemented slice:
 4. OIDC-backed app-session exchange with rotating refresh tokens in BFF layer
 5. push fallback with provider-specific APNs/FCM adapters in realtime gateway
 6. internal realtime publish endpoint for channel fanout (`/app/v1/realtime/publish`)
-7. mobile scaffold with `apps/mobile/shared-kmp` (contracts + offline queue + typed BFF/realtime clients + queue-store rehydration + feature-flag caching client + HTTP transport adapter boundary + courier replay workflow service) and native shell directories for iOS/Android
+7. mobile scaffold with `apps/mobile/shared-kmp` (contracts + offline queue + typed BFF/realtime clients + queue-store rehydration + feature-flag caching client + HTTP transport adapter boundary + default JSON body mapper + JVM HTTP executor + courier replay workflow service) and native shell directories for iOS/Android
 
 ## 2. Topology
 
@@ -59,6 +59,7 @@ Current implemented slice:
 5. When no websocket subscriber exists for a channel, realtime gateway sends push fallback via provider adapters.
 6. Mobile clients consume BFF/realtime through typed `shared-kmp` adapters over an abstract transport boundary (`BffTransport`).
 7. `shared-kmp` includes an HTTP transport adapter (`HttpBffTransport`) that converts typed requests into URL/query/header/body HTTP calls through injectable executor/mapper interfaces.
+8. current shared-kmp baseline now includes `DefaultJsonHttpBodyMapper` and `JvmHttpTransportExecutor` so typed clients can call live BFF endpoints through concrete transport on JVM.
 
 Current concrete adapter mappings:
 
@@ -129,10 +130,11 @@ Implemented quality gates in this slice:
 5. `npm run test:app-layer` as app-layer test gate
 6. `npm run test:mobile-shared-kmp` as KMP shared-core gate (Docker Gradle `jvmTest`)
 7. shared-kmp typed client tests for consumer/courier/ops/realtime route and payload mapping
+8. shared-kmp JVM integration tests for JSON mapping and live HTTP round-trip using `JvmHttpTransportExecutor`
 
 ## 7. Remaining Work To Full V1
 
 1. full native mobile project wiring (Compose/SwiftUI app projects + build pipelines)
-2. shared-kmp expansion: production-grade persistence implementation (e.g., SQLDelight), remote feature-flag source integration, and platform HTTP executor/JSON mapper implementations
+2. shared-kmp expansion: production-grade persistence implementation (e.g., SQLDelight), remote feature-flag source integration, and Android/iOS concrete transport implementations aligned to platform networking stacks
 3. backend event-bus to realtime-gateway publish integration hardening
 4. e2e journey gates across all four surfaces
