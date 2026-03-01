@@ -28,6 +28,22 @@ function createTestOpsDependencies() {
             },
         ],
         listAdminIncidents: async () => [{ id: "incident-1", severity: "HIGH" }],
+        listAdminComplianceAuditEvents: async () => [
+            {
+                auditEventId: "audit-1",
+                actionType: "PAYOUT_RELEASED",
+                actorId: "finance-ops-1",
+                targetType: "PAYOUT_BATCH",
+                targetId: "batch-1",
+                reasonCode: "SCHEDULED_RELEASE",
+                metadata: {
+                    payoutBatchId: "batch-1",
+                },
+                timestamp: "2026-02-20T00:00:00.000Z",
+                previousHash: "genesis",
+                hash: "hash-1",
+            },
+        ],
         getAdminSloDashboard: async () => ({
             availabilityPercent: 99.7,
             checkoutP95Ms: 810,
@@ -188,12 +204,14 @@ test("ops-bff requires persona-scoped access token for merchant/admin data route
             headers: { authorization: `Bearer ${adminSession.tokenPair.accessToken}` },
         });
         assert.equal(adminWithAuth.status, 200);
+        const adminAuditNoAuth = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/compliance/audit-events`);
+        assert.equal(adminAuditNoAuth.status, 401);
     }
     finally {
         await app.close();
     }
 });
-test("ops-bff serves merchant orders, merchant payouts, admin incidents, and admin slo dashboard", async () => {
+test("ops-bff serves merchant orders, merchant payouts, admin incidents, admin slo dashboard, and admin audit events", async () => {
     const dependencies = createTestOpsDependencies();
     const merchantToken = (await dependencies.sessionAuth.issueSession({
         userId: "merchant-1",
@@ -241,6 +259,13 @@ test("ops-bff serves merchant orders, merchant payouts, admin incidents, and adm
         assert.equal(sloPayload.availabilityPercent, 99.7);
         assert.equal(sloPayload.checkoutP95Ms, 810);
         assert.equal(sloPayload.breaches[0]?.type, "LATENCY_CHECKOUT");
+        const auditResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/compliance/audit-events`, {
+            headers: { authorization: `Bearer ${adminToken}` },
+        });
+        assert.equal(auditResponse.status, 200);
+        const auditPayload = (await auditResponse.json());
+        assert.equal(auditPayload.events[0]?.auditEventId, "audit-1");
+        assert.equal(auditPayload.events[0]?.actionType, "PAYOUT_RELEASED");
     }
     finally {
         await app.close();
@@ -286,7 +311,7 @@ test("ops-bff returns merchant and admin feature-flag snapshots", async () => {
         await app.close();
     }
 });
-test("ops-bff core-api dependency calls merchant and observability endpoints", async () => {
+test("ops-bff core-api dependency calls merchant and observability/compliance endpoints", async () => {
     const requests = [];
     const backend = createHttpServer((request, response) => {
         requests.push({
@@ -348,6 +373,29 @@ test("ops-bff core-api dependency calls merchant and observability endpoints", a
                 checkoutP95Ms: 720,
                 timelineP95Ms: 440,
                 breaches: [],
+            }));
+            return;
+        }
+        if (request.method === "GET" && request.url === "/internal/risk/compliance/audit/events") {
+            response.statusCode = 200;
+            response.setHeader("content-type", "application/json");
+            response.end(JSON.stringify({
+                events: [
+                    {
+                        auditEventId: "audit-backend-1",
+                        actionType: "REFUND_APPROVED",
+                        actorId: "support-1",
+                        targetType: "REFUND",
+                        targetId: "refund-1",
+                        reasonCode: "DISPUTE_RESOLVED",
+                        metadata: {
+                            ticketId: "ticket-1",
+                        },
+                        timestamp: "2026-02-20T01:00:00.000Z",
+                        previousHash: "hash-0",
+                        hash: "hash-1",
+                    },
+                ],
             }));
             return;
         }
@@ -423,6 +471,13 @@ test("ops-bff core-api dependency calls merchant and observability endpoints", a
         assert.equal(sloPayload.availabilityPercent, 99.8);
         assert.equal(sloPayload.checkoutP95Ms, 720);
         assert.equal(sloPayload.timelineP95Ms, 440);
+        const auditResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/compliance/audit-events`, {
+            headers: { authorization: `Bearer ${adminToken}` },
+        });
+        assert.equal(auditResponse.status, 200);
+        const auditPayload = (await auditResponse.json());
+        assert.equal(auditPayload.events[0]?.auditEventId, "audit-backend-1");
+        assert.equal(auditPayload.events[0]?.actionType, "REFUND_APPROVED");
         assert.equal(requests[0]?.method, "GET");
         assert.equal(requests[0]?.url, "/api/v1/merchant/orders?merchantId=merchant-2");
         assert.equal(requests[1]?.method, "GET");
@@ -431,6 +486,8 @@ test("ops-bff core-api dependency calls merchant and observability endpoints", a
         assert.equal(requests[2]?.url, "/internal/observability/logs");
         assert.equal(requests[3]?.method, "GET");
         assert.equal(requests[3]?.url, "/internal/observability/slo/dashboard");
+        assert.equal(requests[4]?.method, "GET");
+        assert.equal(requests[4]?.url, "/internal/risk/compliance/audit/events");
     }
     finally {
         await appWithAuth.close();

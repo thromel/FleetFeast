@@ -3,6 +3,19 @@ export interface AdminIncidentView {
   severity: string;
 }
 
+export interface AdminComplianceAuditEventView {
+  auditEventId: string;
+  actionType: string;
+  actorId: string;
+  targetType: string;
+  targetId: string;
+  reasonCode: string;
+  metadata: Record<string, unknown>;
+  timestamp: string;
+  previousHash: string;
+  hash: string;
+}
+
 export interface AdminSloBreachView {
   type: "AVAILABILITY" | "LATENCY_CHECKOUT" | "LATENCY_TIMELINE";
   actual: number;
@@ -137,6 +150,30 @@ export async function fetchAdminFeatureFlags(
     await response.json(),
     "OPS_BFF_ADMIN_FEATURE_FLAGS_INVALID_PAYLOAD",
   );
+}
+
+export async function fetchAdminComplianceAuditEvents(
+  options?: AdminApiOptions,
+): Promise<AdminComplianceAuditEventView[]> {
+  const fetchImpl = options?.fetchImpl ?? fetch;
+  const baseUrl = resolveOpsBffBaseUrl(options);
+  const headers = options?.appSessionToken
+    ? { authorization: `Bearer ${options.appSessionToken}` }
+    : undefined;
+  const response = await fetchImpl(`${baseUrl}/app/v1/admin/compliance/audit-events`, {
+    cache: "no-store",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error("OPS_BFF_ADMIN_COMPLIANCE_AUDIT_EVENTS_FETCH_FAILED");
+  }
+
+  const payload = (await response.json()) as {
+    events?: AdminComplianceAuditEventView[];
+  };
+
+  return payload.events ?? [];
 }
 
 export async function fetchAdminSloDashboard(

@@ -5,6 +5,7 @@ import test from "node:test";
 
 import {
   exchangeAdminSession,
+  fetchAdminComplianceAuditEvents,
   fetchAdminFeatureFlags,
   fetchAdminIncidents,
   fetchAdminSloDashboard,
@@ -217,6 +218,87 @@ test("fetchAdminSloDashboard calls ops-bff admin slo-dashboard endpoint", async 
     assert.equal(dashboard.breaches[0]?.type, "LATENCY_CHECKOUT");
     assert.equal(requests[0]?.method, "GET");
     assert.equal(requests[0]?.url, "/app/v1/admin/slo-dashboard");
+    assert.equal(requests[0]?.authorization, "Bearer session-token-1");
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      backend.close((error?: Error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+});
+
+test("fetchAdminComplianceAuditEvents calls ops-bff admin compliance audit-events endpoint", async () => {
+  const requests: Array<{ method: string; url: string; authorization?: string }> = [];
+  const backend = createHttpServer((request, response) => {
+    requests.push({
+      method: request.method ?? "",
+      url: request.url ?? "",
+      authorization: request.headers.authorization,
+    });
+
+    if (request.method === "GET" && request.url === "/app/v1/admin/compliance/audit-events") {
+      response.statusCode = 200;
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          events: [
+            {
+              auditEventId: "audit-1",
+              actionType: "REFUND_APPROVED",
+              actorId: "support-1",
+              targetType: "REFUND",
+              targetId: "refund-1",
+              reasonCode: "DISPUTE_RESOLVED",
+              metadata: {
+                ticketId: "ticket-1",
+              },
+              timestamp: "2026-02-20T01:00:00.000Z",
+              previousHash: "hash-0",
+              hash: "hash-1",
+            },
+          ],
+        }),
+      );
+      return;
+    }
+
+    response.statusCode = 404;
+    response.end();
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    backend.listen(0, "127.0.0.1", (error?: Error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+
+  try {
+    const address = backend.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind admin compliance-audit test backend");
+    }
+
+    const events = await fetchAdminComplianceAuditEvents({
+      opsBffBaseUrl: `http://127.0.0.1:${address.port}`,
+      appSessionToken: "session-token-1",
+    });
+
+    assert.equal(events.length, 1);
+    assert.equal(events[0]?.auditEventId, "audit-1");
+    assert.equal(events[0]?.actionType, "REFUND_APPROVED");
+    assert.equal(requests[0]?.method, "GET");
+    assert.equal(requests[0]?.url, "/app/v1/admin/compliance/audit-events");
     assert.equal(requests[0]?.authorization, "Bearer session-token-1");
   } finally {
     await new Promise<void>((resolve, reject) => {

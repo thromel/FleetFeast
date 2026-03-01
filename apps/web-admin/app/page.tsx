@@ -1,5 +1,10 @@
 import { createAdminAuthSessionManager } from "../src/lib/auth-session-manager";
-import { fetchAdminFeatureFlags, fetchAdminIncidents, fetchAdminSloDashboard } from "../src/lib/api";
+import {
+  fetchAdminComplianceAuditEvents,
+  fetchAdminFeatureFlags,
+  fetchAdminIncidents,
+  fetchAdminSloDashboard,
+} from "../src/lib/api";
 
 export default async function AdminPage() {
   const sessionExchange = process.env.WEB_ADMIN_OIDC_TOKEN
@@ -16,6 +21,9 @@ export default async function AdminPage() {
   const featureFlagTenantId = process.env.WEB_ADMIN_FEATURE_FLAG_TENANT_ID;
   const hasAppSession = typeof appSessionToken === "string" && appSessionToken.length > 0;
   const incidents = hasAppSession ? await fetchAdminIncidents({ appSessionToken }) : [];
+  const complianceAuditEvents = hasAppSession
+    ? await fetchAdminComplianceAuditEvents({ appSessionToken })
+    : [];
   const sloDashboard = hasAppSession
     ? await fetchAdminSloDashboard({ appSessionToken })
     : null;
@@ -75,6 +83,21 @@ export default async function AdminPage() {
           </ul>
         ) : (
           <p className="meta">SLO metrics unavailable without an app session.</p>
+        )}
+        <h2 className="headline">Compliance Audit Feed</h2>
+        {complianceAuditEvents.length > 0 ? (
+          <ul className="list">
+            {complianceAuditEvents.map((event) => (
+              <li key={event.auditEventId} className="item">
+                <span>
+                  {event.actionType} · {event.actorId} · {event.reasonCode}
+                </span>
+                <span className="chip">{event.targetType}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="meta">No compliance audit events found for the current environment.</p>
         )}
         <h2 className="headline">Feature Flags</h2>
         {featureFlags ? (

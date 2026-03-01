@@ -41,6 +41,19 @@ export interface AdminIncidentView {
   severity: string;
 }
 
+export interface AdminComplianceAuditEventView {
+  auditEventId: string;
+  actionType: string;
+  actorId: string;
+  targetType: string;
+  targetId: string;
+  reasonCode: string;
+  metadata: Record<string, unknown>;
+  timestamp: string;
+  previousHash: string;
+  hash: string;
+}
+
 export interface AdminSloBreachView {
   type: "AVAILABILITY" | "LATENCY_CHECKOUT" | "LATENCY_TIMELINE";
   actual: number;
@@ -70,6 +83,7 @@ export interface OpsBffDependencies {
   listMerchantOrders(merchantId: string): Promise<MerchantOrderView[]>;
   listMerchantPayoutStatements(merchantId: string): Promise<MerchantPayoutStatementView[]>;
   listAdminIncidents(): Promise<AdminIncidentView[]>;
+  listAdminComplianceAuditEvents(): Promise<AdminComplianceAuditEventView[]>;
   getAdminSloDashboard(): Promise<AdminSloDashboardView>;
   getMerchantFeatureFlagSnapshot(context: OpsFeatureFlagContext): Promise<OpsFeatureFlagSnapshot>;
   getAdminFeatureFlagSnapshot(context: OpsFeatureFlagContext): Promise<OpsFeatureFlagSnapshot>;
@@ -89,6 +103,7 @@ export function createOpsCoreApiDependencies(
   | "listMerchantOrders"
   | "listMerchantPayoutStatements"
   | "listAdminIncidents"
+  | "listAdminComplianceAuditEvents"
   | "getAdminSloDashboard"
   | "getMerchantFeatureFlagSnapshot"
   | "getAdminFeatureFlagSnapshot"
@@ -135,6 +150,18 @@ export function createOpsCoreApiDependencies(
         id: log.traceId,
         severity: log.statusCode >= 500 ? "HIGH" : "LOW",
       }));
+    },
+    async listAdminComplianceAuditEvents(): Promise<AdminComplianceAuditEventView[]> {
+      const response = await fetchImpl(`${baseUrl}/internal/risk/compliance/audit/events`);
+      if (!response.ok) {
+        throw new Error("CORE_API_COMPLIANCE_AUDIT_EVENTS_FETCH_FAILED");
+      }
+
+      const payload = (await response.json()) as {
+        events?: AdminComplianceAuditEventView[];
+      };
+
+      return payload.events ?? [];
     },
     async getAdminSloDashboard(): Promise<AdminSloDashboardView> {
       const response = await fetchImpl(`${baseUrl}/internal/observability/slo/dashboard`);
@@ -517,6 +544,19 @@ export function createOpsBffServer(dependencies: OpsBffDependencies): FastifyIns
 
     const incidents = await dependencies.listAdminIncidents();
     return { incidents };
+  });
+
+  app.get("/app/v1/admin/compliance/audit-events", async (request, reply) => {
+    const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+      persona: "admin",
+      allowedRoles: ADMIN_ALLOWED_ROLES,
+    });
+    if (!claims) {
+      return;
+    }
+
+    const events = await dependencies.listAdminComplianceAuditEvents();
+    return { events };
   });
 
   app.get("/app/v1/admin/slo-dashboard", async (request, reply) => {

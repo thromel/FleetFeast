@@ -33,6 +33,14 @@ export function createOpsCoreApiDependencies(options) {
                 severity: log.statusCode >= 500 ? "HIGH" : "LOW",
             }));
         },
+        async listAdminComplianceAuditEvents() {
+            const response = await fetchImpl(`${baseUrl}/internal/risk/compliance/audit/events`);
+            if (!response.ok) {
+                throw new Error("CORE_API_COMPLIANCE_AUDIT_EVENTS_FETCH_FAILED");
+            }
+            const payload = (await response.json());
+            return payload.events ?? [];
+        },
         async getAdminSloDashboard() {
             const response = await fetchImpl(`${baseUrl}/internal/observability/slo/dashboard`);
             if (!response.ok) {
@@ -344,6 +352,17 @@ export function createOpsBffServer(dependencies) {
         }
         const incidents = await dependencies.listAdminIncidents();
         return { incidents };
+    });
+    app.get("/app/v1/admin/compliance/audit-events", async (request, reply) => {
+        const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+            persona: "admin",
+            allowedRoles: ADMIN_ALLOWED_ROLES,
+        });
+        if (!claims) {
+            return;
+        }
+        const events = await dependencies.listAdminComplianceAuditEvents();
+        return { events };
     });
     app.get("/app/v1/admin/slo-dashboard", async (request, reply) => {
         const claims = await authorizeDataRoute(request.headers.authorization, reply, {

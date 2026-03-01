@@ -26,6 +26,18 @@ export interface AdminIncidentView {
     id: string;
     severity: string;
 }
+export interface AdminComplianceAuditEventView {
+    auditEventId: string;
+    actionType: string;
+    actorId: string;
+    targetType: string;
+    targetId: string;
+    reasonCode: string;
+    metadata: Record<string, unknown>;
+    timestamp: string;
+    previousHash: string;
+    hash: string;
+}
 export interface AdminSloBreachView {
     type: "AVAILABILITY" | "LATENCY_CHECKOUT" | "LATENCY_TIMELINE";
     actual: number;
@@ -51,6 +63,7 @@ export interface OpsBffDependencies {
     listMerchantOrders(merchantId: string): Promise<MerchantOrderView[]>;
     listMerchantPayoutStatements(merchantId: string): Promise<MerchantPayoutStatementView[]>;
     listAdminIncidents(): Promise<AdminIncidentView[]>;
+    listAdminComplianceAuditEvents(): Promise<AdminComplianceAuditEventView[]>;
     getAdminSloDashboard(): Promise<AdminSloDashboardView>;
     getMerchantFeatureFlagSnapshot(context: OpsFeatureFlagContext): Promise<OpsFeatureFlagSnapshot>;
     getAdminFeatureFlagSnapshot(context: OpsFeatureFlagContext): Promise<OpsFeatureFlagSnapshot>;
@@ -61,6 +74,6 @@ export interface OpsCoreApiDependencyOptions {
     coreApiBaseUrl: string;
     fetchImpl?: typeof fetch;
 }
-export declare function createOpsCoreApiDependencies(options: OpsCoreApiDependencyOptions): Pick<OpsBffDependencies, "listMerchantOrders" | "listMerchantPayoutStatements" | "listAdminIncidents" | "getAdminSloDashboard" | "getMerchantFeatureFlagSnapshot" | "getAdminFeatureFlagSnapshot">;
+export declare function createOpsCoreApiDependencies(options: OpsCoreApiDependencyOptions): Pick<OpsBffDependencies, "listMerchantOrders" | "listMerchantPayoutStatements" | "listAdminIncidents" | "listAdminComplianceAuditEvents" | "getAdminSloDashboard" | "getMerchantFeatureFlagSnapshot" | "getAdminFeatureFlagSnapshot">;
 export declare function createOpsBffServer(dependencies: OpsBffDependencies): FastifyInstance;
 export declare function createOpsBffServerFromEnv(): FastifyInstance;
