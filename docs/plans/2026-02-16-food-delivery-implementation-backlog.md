@@ -404,7 +404,7 @@ Backlog is accepted when:
 
 ## 11. Backend Implementation Progress (Live Tracker)
 
-Last updated: `2026-02-19`
+Last updated: `2026-03-01`
 
 ### 11.1 Epic Status Snapshot (Backend Features)
 
@@ -446,7 +446,13 @@ Last updated: `2026-02-19`
 | `78b0c74` | E07-* | Persisted payment intents/refunds/audit artifacts |
 | `51e4e68` | Cross-cutting | Added pluggable persistent stores and broker adapters |
 
-### 11.3 Next Backend Features Queue
+### 11.3 Recent Backend Delivery Log (Addendum)
+
+| Commit | Story Mapping | Outcome |
+|---|---|---|
+| (current) | E12 / cross-cutting | Added `RealtimeEventForwarder` interface and `HttpRealtimeEventForwarder` to core-api platform layer; wired into `DurableEventBus` so order lifecycle and dispatch assignment events are forwarded to realtime-gateway publish endpoint; channel mapping and HTTP forwarder covered by 15 tests |
+
+### 11.4 Next Backend Features Queue
 
 1. No open backend features remain in the current Balanced V1 backlog scope.
 

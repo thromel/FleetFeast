@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { InMemoryEventBroker } from "../broker/in-memory-event-broker.js";
 import { InMemoryDocumentStore } from "../persistence/in-memory-document-store.js";
+import type { RealtimeEventForwarder } from "../realtime/realtime-event-forwarder.js";
 import { DurableEventBus } from "./durable-event-bus.js";
 
 test("durable event bus hydrates existing outbox events on startup", async () => {
@@ -45,4 +46,33 @@ test("durable event bus appends events to outbox store and publishes broker mess
 
   assert.equal(broker.messages.length, 1);
   assert.equal(broker.messages[0]?.topic, "order.created.v1");
+});
+
+test("durable event bus calls realtime forwarder for each published event", async () => {
+  const forwarded: Array<{ type: string }> = [];
+  const forwarder: RealtimeEventForwarder = {
+    async forward(event) {
+      forwarded.push({ type: event.type });
+    },
+  };
+
+  const eventBus = new DurableEventBus(undefined, undefined, "platform.event_outbox", forwarder);
+
+  eventBus.publish({
+    type: "order.created.v1",
+    occurredAt: "2026-03-01T00:00:00.000Z",
+    payload: { orderId: "order-rt-1" },
+  });
+
+  eventBus.publish({
+    type: "dispatch.assignment.completed.v1",
+    occurredAt: "2026-03-01T00:00:00.000Z",
+    payload: { orderId: "order-rt-1", courierId: "courier-1" },
+  });
+
+  await eventBus.flush();
+
+  assert.equal(forwarded.length, 2);
+  assert.equal(forwarded[0]?.type, "order.created.v1");
+  assert.equal(forwarded[1]?.type, "dispatch.assignment.completed.v1");
 });

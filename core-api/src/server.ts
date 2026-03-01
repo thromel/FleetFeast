@@ -8,6 +8,10 @@ import type { EventBroker } from "./platform/broker/event-broker.js";
 import { RedisEventBroker } from "./platform/broker/redis-event-broker.js";
 import { DurableEventBus } from "./platform/events/durable-event-bus.js";
 import type { DocumentStore } from "./platform/persistence/document-store.js";
+import {
+  HttpRealtimeEventForwarder,
+  type RealtimeEventForwarder,
+} from "./platform/realtime/realtime-event-forwarder.js";
 import { PostgresDocumentStore } from "./platform/persistence/postgres-document-store.js";
 import { PersistentSessionStore } from "./platform/persistence/repositories/persistent-session-store.js";
 import { PersistentIdentityRepository } from "./platform/persistence/repositories/persistent-identity-repository.js";
@@ -217,6 +221,7 @@ export interface CreateServerOptions {
   documentStore?: DocumentStore;
   eventBroker?: EventBroker;
   dispatchAssignmentClient?: DispatchAssignmentClient;
+  realtimeForwarder?: RealtimeEventForwarder;
 }
 
 function resolveDocumentStore(options: CreateServerOptions): DocumentStore | undefined {
@@ -262,6 +267,24 @@ function resolveDispatchAssignmentClient(
   }
 
   return new GrpcDispatchAssignmentClient(target);
+}
+
+function resolveRealtimeForwarder(
+  options: CreateServerOptions,
+): RealtimeEventForwarder | undefined {
+  if (options.realtimeForwarder) {
+    return options.realtimeForwarder;
+  }
+
+  const baseUrl = process.env.REALTIME_GATEWAY_BASE_URL;
+  if (!baseUrl || baseUrl.trim().length === 0) {
+    return undefined;
+  }
+
+  return new HttpRealtimeEventForwarder({
+    realtimeGatewayBaseUrl: baseUrl,
+    publishApiKey: process.env.REALTIME_PUBLISH_API_KEY,
+  });
 }
 
 function sendJson(
@@ -2000,8 +2023,9 @@ export function createServer(options: CreateServerOptions = {}) {
 
   const eventBroker = resolveEventBroker(options);
   const dispatchAssignmentClient = resolveDispatchAssignmentClient(options);
+  const realtimeForwarder = resolveRealtimeForwarder(options);
   const eventBus = persistenceEnabled
-    ? new DurableEventBus(documentStore, eventBroker)
+    ? new DurableEventBus(documentStore, eventBroker, "platform.event_outbox", realtimeForwarder)
     : new InMemoryEventBus();
   const repository = persistenceEnabled
     ? new PersistentIdentityRepository(documentStore!)

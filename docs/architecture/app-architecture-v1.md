@@ -101,6 +101,7 @@ BFF and web services are environment-driven:
 4. `OIDC_JWKS_URI`, `OIDC_ISSUER`, `OIDC_AUDIENCE` for provider-backed OIDC token verification (`dev:*` verifier fallback when unset)
 5. `APNS_PUSH_ENDPOINT`, `APNS_PUSH_AUTH_TOKEN`, `FCM_PUSH_ENDPOINT`, `FCM_PUSH_AUTH_TOKEN` for push fallback provider adapters
 6. `REALTIME_PUBLISH_API_KEY` optional shared key for `/app/v1/realtime/publish`
+7. `REALTIME_GATEWAY_BASE_URL` for `core-api` event-bus-to-realtime-gateway forwarding (e.g., `http://127.0.0.1:4104`); when set, `DurableEventBus` forwards order lifecycle and dispatch assignment domain events to the gateway publish endpoint; `REALTIME_PUBLISH_API_KEY` is also used as the forwarding API key when both are set
 7. fixed local ports in current dev stack:
    - `core-api`: `3000`
    - `consumer-bff`: `4101`
@@ -158,5 +159,5 @@ Implemented quality gates in this slice:
 
 1. full native mobile app project wiring for Android (Compose app targets + build pipelines consuming the shell modules) and SwiftUI app targets that consume the iOS shell packages
 2. shared-kmp expansion: cross-platform production persistence implementation (e.g., SQLDelight) and Android/iOS concrete transport implementations aligned to platform networking stacks
-3. backend event-bus to realtime-gateway publish integration hardening
+3. ~~backend event-bus to realtime-gateway publish integration hardening~~ **Done** — `RealtimeEventForwarder` interface and `HttpRealtimeEventForwarder` added to `core-api` platform layer; `DurableEventBus` forwards order lifecycle and dispatch assignment events to the realtime gateway publish endpoint; activated via `REALTIME_GATEWAY_BASE_URL` env var with optional `REALTIME_PUBLISH_API_KEY`
 4. e2e journey gates across all four surfaces

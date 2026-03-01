@@ -4,6 +4,7 @@ import { InMemoryEventBus } from "../../modules/identity/in-memory-event-bus.js"
 import type { DomainEvent } from "../../modules/identity/types.js";
 import type { EventBroker } from "../broker/event-broker.js";
 import type { DocumentStore } from "../persistence/document-store.js";
+import type { RealtimeEventForwarder } from "../realtime/realtime-event-forwarder.js";
 
 export class DurableEventBus extends InMemoryEventBus {
   private readonly hydrationTask: Promise<void>;
@@ -13,6 +14,7 @@ export class DurableEventBus extends InMemoryEventBus {
     private readonly documentStore?: DocumentStore,
     private readonly broker?: EventBroker,
     private readonly outboxNamespace: string = "platform.event_outbox",
+    private readonly realtimeForwarder?: RealtimeEventForwarder,
   ) {
     super();
     this.hydrationTask = this.hydrateFromOutbox();
@@ -52,6 +54,10 @@ export class DurableEventBus extends InMemoryEventBus {
 
     if (this.broker) {
       await this.broker.publish(event.type, JSON.stringify(event));
+    }
+
+    if (this.realtimeForwarder) {
+      await this.realtimeForwarder.forward(event);
     }
   }
 }
