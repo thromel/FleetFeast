@@ -15,6 +15,26 @@ export interface MerchantOrderView {
   status: string;
 }
 
+export interface MerchantPayoutStatementLineItemView {
+  label: string;
+  amount: number;
+}
+
+export interface MerchantPayoutStatementView {
+  statementId: string;
+  payoutBatchId: string;
+  entityType: "MERCHANT";
+  entityId: string;
+  periodStart: string;
+  periodEnd: string;
+  currency: string;
+  totalAmount: number;
+  lineItems: MerchantPayoutStatementLineItemView[];
+  format: "PDF" | "PLAINTEXT";
+  renderedContent: string;
+  createdAt: string;
+}
+
 export interface AdminIncidentView {
   id: string;
   severity: string;
@@ -34,6 +54,7 @@ export interface OpsFeatureFlagSnapshot {
 
 export interface OpsBffDependencies {
   listMerchantOrders(merchantId: string): Promise<MerchantOrderView[]>;
+  listMerchantPayoutStatements(merchantId: string): Promise<MerchantPayoutStatementView[]>;
   listAdminIncidents(): Promise<AdminIncidentView[]>;
   getMerchantFeatureFlagSnapshot(context: OpsFeatureFlagContext): Promise<OpsFeatureFlagSnapshot>;
   getAdminFeatureFlagSnapshot(context: OpsFeatureFlagContext): Promise<OpsFeatureFlagSnapshot>;
@@ -50,7 +71,11 @@ export function createOpsCoreApiDependencies(
   options: OpsCoreApiDependencyOptions,
 ): Pick<
   OpsBffDependencies,
-  "listMerchantOrders" | "listAdminIncidents" | "getMerchantFeatureFlagSnapshot" | "getAdminFeatureFlagSnapshot"
+  | "listMerchantOrders"
+  | "listMerchantPayoutStatements"
+  | "listAdminIncidents"
+  | "getMerchantFeatureFlagSnapshot"
+  | "getAdminFeatureFlagSnapshot"
 > {
   const baseUrl = options.coreApiBaseUrl.replace(/\/+$/, "");
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -94,6 +119,22 @@ export function createOpsCoreApiDependencies(
         id: log.traceId,
         severity: log.statusCode >= 500 ? "HIGH" : "LOW",
       }));
+    },
+    async listMerchantPayoutStatements(
+      merchantId: string,
+    ): Promise<MerchantPayoutStatementView[]> {
+      const response = await fetchImpl(
+        `${baseUrl}/api/v1/merchant/payouts?merchantId=${encodeURIComponent(merchantId)}`,
+      );
+      if (!response.ok) {
+        throw new Error("CORE_API_MERCHANT_PAYOUTS_FETCH_FAILED");
+      }
+
+      const payload = (await response.json()) as {
+        statements?: MerchantPayoutStatementView[];
+      };
+
+      return payload.statements ?? [];
     },
     async getMerchantFeatureFlagSnapshot(): Promise<OpsFeatureFlagSnapshot> {
       return {
@@ -361,6 +402,20 @@ export function createOpsBffServer(dependencies: OpsBffDependencies): FastifyIns
 
     const orders = await dependencies.listMerchantOrders(query.merchantId);
     return { orders };
+  });
+
+  app.get("/app/v1/merchant/payouts", async (request, reply) => {
+    const query = request.query as { merchantId?: unknown };
+    if (typeof query?.merchantId !== "string" || query.merchantId.trim().length === 0) {
+      reply.status(400);
+      return {
+        errorCode: "INVALID_MERCHANT_QUERY",
+        message: "merchantId query is required",
+      };
+    }
+
+    const statements = await dependencies.listMerchantPayoutStatements(query.merchantId);
+    return { statements };
   });
 
   app.get("/app/v1/merchant/feature-flags", async (request, reply) => {

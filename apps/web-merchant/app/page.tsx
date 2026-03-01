@@ -1,5 +1,9 @@
 import { createMerchantAuthSessionManager } from "../src/lib/auth-session-manager";
-import { fetchMerchantFeatureFlags, fetchMerchantOrders } from "../src/lib/api";
+import {
+  fetchMerchantFeatureFlags,
+  fetchMerchantOrders,
+  fetchMerchantPayoutStatements,
+} from "../src/lib/api";
 
 export default async function MerchantPage() {
   const merchantId = process.env.MERCHANT_ID ?? "merchant-1";
@@ -18,6 +22,7 @@ export default async function MerchantPage() {
     process.env.WEB_MERCHANT_FEATURE_FLAG_ROLE ?? sessionExchange?.session.role;
   const featureFlagTenantId = process.env.WEB_MERCHANT_FEATURE_FLAG_TENANT_ID;
   const orders = await fetchMerchantOrders(merchantId, { appSessionToken });
+  const payoutStatements = await fetchMerchantPayoutStatements(merchantId, { appSessionToken });
   const featureFlags =
     featureFlagUserId && featureFlagRole
       ? await fetchMerchantFeatureFlags(
@@ -40,6 +45,17 @@ export default async function MerchantPage() {
             <li key={order.id} className="item">
               <span>{order.id}</span>
               <span className="chip">{order.status}</span>
+            </li>
+          ))}
+        </ul>
+        <h2 className="headline">Recent Payout Statements</h2>
+        <ul className="list">
+          {payoutStatements.map((statement) => (
+            <li key={statement.statementId} className="item">
+              <span>
+                {statement.statementId} · {statement.currency} {statement.totalAmount}
+              </span>
+              <span className="chip">{statement.format}</span>
             </li>
           ))}
         </ul>

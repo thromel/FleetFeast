@@ -4,11 +4,36 @@ import test from "node:test";
 
 import { createAppSessionAuthService, createDevOidcVerifier } from "@fleetfeast/app-auth";
 
-import { createOpsBffServer, createOpsCoreApiDependencies } from "./server.js";
+import {
+  createOpsBffServer,
+  createOpsCoreApiDependencies,
+  type OpsBffDependencies,
+} from "./server.js";
 
-function createTestOpsDependencies() {
+function createTestOpsDependencies(): OpsBffDependencies {
   return {
     listMerchantOrders: async () => [{ id: "order-1", status: "MERCHANT_ACCEPTED" }],
+    listMerchantPayoutStatements: async () => [
+      {
+        statementId: "stmt-1",
+        payoutBatchId: "batch-1",
+        entityType: "MERCHANT",
+        entityId: "merchant-1",
+        periodStart: "2026-02-01T00:00:00.000Z",
+        periodEnd: "2026-02-07T23:59:59.999Z",
+        currency: "USD",
+        totalAmount: 18250,
+        lineItems: [
+          {
+            label: "Net payout",
+            amount: 18250,
+          },
+        ],
+        format: "PDF",
+        renderedContent: "statement-content",
+        createdAt: "2026-02-08T03:00:00.000Z",
+      },
+    ],
     listAdminIncidents: async () => [{ id: "incident-1", severity: "HIGH" }],
     getMerchantFeatureFlagSnapshot: async () => ({
       flags: {
@@ -143,7 +168,7 @@ test("ops-bff refresh endpoint rotates admin refresh token", async () => {
   }
 });
 
-test("ops-bff serves merchant orders and admin incidents", async () => {
+test("ops-bff serves merchant orders, merchant payouts, and admin incidents", async () => {
   const app = createOpsBffServer(createTestOpsDependencies());
   await app.listen({ port: 0, host: "127.0.0.1" });
 
@@ -161,6 +186,16 @@ test("ops-bff serves merchant orders and admin incidents", async () => {
       orders: Array<{ id: string }>;
     };
     assert.equal(merchantPayload.orders[0]?.id, "order-1");
+
+    const payoutsResponse = await fetch(
+      `http://127.0.0.1:${address.port}/app/v1/merchant/payouts?merchantId=merchant-1`,
+    );
+    assert.equal(payoutsResponse.status, 200);
+    const payoutsPayload = (await payoutsResponse.json()) as {
+      statements: Array<{ statementId: string; totalAmount: number }>;
+    };
+    assert.equal(payoutsPayload.statements[0]?.statementId, "stmt-1");
+    assert.equal(payoutsPayload.statements[0]?.totalAmount, 18250);
 
     const adminResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/incidents`);
     assert.equal(adminResponse.status, 200);
@@ -226,6 +261,37 @@ test("ops-bff core-api dependency calls merchant and observability endpoints", a
       return;
     }
 
+    if (request.method === "GET" && request.url === "/api/v1/merchant/payouts?merchantId=merchant-2") {
+      response.statusCode = 200;
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          statements: [
+            {
+              statementId: "stmt-backend-2",
+              payoutBatchId: "batch-backend-2",
+              entityType: "MERCHANT",
+              entityId: "merchant-2",
+              periodStart: "2026-02-01T00:00:00.000Z",
+              periodEnd: "2026-02-07T23:59:59.999Z",
+              currency: "USD",
+              totalAmount: 22400,
+              lineItems: [
+                {
+                  label: "Net payout",
+                  amount: 22400,
+                },
+              ],
+              format: "PDF",
+              renderedContent: "backend-statement",
+              createdAt: "2026-02-08T03:00:00.000Z",
+            },
+          ],
+        }),
+      );
+      return;
+    }
+
     if (request.method === "GET" && request.url === "/internal/observability/logs") {
       response.statusCode = 200;
       response.setHeader("content-type", "application/json");
@@ -288,6 +354,16 @@ test("ops-bff core-api dependency calls merchant and observability endpoints", a
     };
     assert.equal(merchantPayload.orders[0]?.id, "order-backend-2");
 
+    const payoutsResponse = await fetch(
+      `http://127.0.0.1:${address.port}/app/v1/merchant/payouts?merchantId=merchant-2`,
+    );
+    assert.equal(payoutsResponse.status, 200);
+    const payoutsPayload = (await payoutsResponse.json()) as {
+      statements: Array<{ statementId: string; totalAmount: number }>;
+    };
+    assert.equal(payoutsPayload.statements[0]?.statementId, "stmt-backend-2");
+    assert.equal(payoutsPayload.statements[0]?.totalAmount, 22400);
+
     const adminResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/incidents`);
     assert.equal(adminResponse.status, 200);
     const adminPayload = (await adminResponse.json()) as {
@@ -299,7 +375,9 @@ test("ops-bff core-api dependency calls merchant and observability endpoints", a
     assert.equal(requests[0]?.method, "GET");
     assert.equal(requests[0]?.url, "/api/v1/merchant/orders?merchantId=merchant-2");
     assert.equal(requests[1]?.method, "GET");
-    assert.equal(requests[1]?.url, "/internal/observability/logs");
+    assert.equal(requests[1]?.url, "/api/v1/merchant/payouts?merchantId=merchant-2");
+    assert.equal(requests[2]?.method, "GET");
+    assert.equal(requests[2]?.url, "/internal/observability/logs");
   } finally {
     await app.close();
     await new Promise<void>((resolve, reject) => {

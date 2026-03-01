@@ -3,6 +3,26 @@ export interface MerchantOrderView {
   status: string;
 }
 
+export interface MerchantPayoutStatementLineItemView {
+  label: string;
+  amount: number;
+}
+
+export interface MerchantPayoutStatementView {
+  statementId: string;
+  payoutBatchId: string;
+  entityType: "MERCHANT";
+  entityId: string;
+  periodStart: string;
+  periodEnd: string;
+  currency: string;
+  totalAmount: number;
+  lineItems: MerchantPayoutStatementLineItemView[];
+  format: "PDF" | "PLAINTEXT";
+  renderedContent: string;
+  createdAt: string;
+}
+
 export interface MerchantFeatureFlagContext {
   userId: string;
   role: string;
@@ -128,6 +148,34 @@ export async function fetchMerchantFeatureFlags(
     await response.json(),
     "OPS_BFF_MERCHANT_FEATURE_FLAGS_INVALID_PAYLOAD",
   );
+}
+
+export async function fetchMerchantPayoutStatements(
+  merchantId: string,
+  options?: MerchantApiOptions,
+): Promise<MerchantPayoutStatementView[]> {
+  const fetchImpl = options?.fetchImpl ?? fetch;
+  const baseUrl = resolveOpsBffBaseUrl(options);
+  const headers = options?.appSessionToken
+    ? { authorization: `Bearer ${options.appSessionToken}` }
+    : undefined;
+  const response = await fetchImpl(
+    `${baseUrl}/app/v1/merchant/payouts?merchantId=${encodeURIComponent(merchantId)}`,
+    {
+      cache: "no-store",
+      headers,
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("OPS_BFF_MERCHANT_PAYOUTS_FETCH_FAILED");
+  }
+
+  const payload = (await response.json()) as {
+    statements?: MerchantPayoutStatementView[];
+  };
+
+  return payload.statements ?? [];
 }
 
 export async function exchangeMerchantSession(

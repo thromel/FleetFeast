@@ -7,6 +7,7 @@ import {
   exchangeMerchantSession,
   fetchMerchantFeatureFlags,
   fetchMerchantOrders,
+  fetchMerchantPayoutStatements,
   refreshMerchantSession,
 } from "./api.js";
 
@@ -140,6 +141,92 @@ test("fetchMerchantFeatureFlags calls ops-bff merchant feature-flags endpoint", 
       requests[0]?.url,
       "/app/v1/merchant/feature-flags?userId=merchant-user-1&role=merchant_operator&tenantId=metro-1",
     );
+    assert.equal(requests[0]?.authorization, "Bearer session-token-1");
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      backend.close((error?: Error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+});
+
+test("fetchMerchantPayoutStatements calls ops-bff merchant payouts endpoint", async () => {
+  const requests: Array<{ method: string; url: string; authorization?: string }> = [];
+  const backend = createHttpServer((request, response) => {
+    requests.push({
+      method: request.method ?? "",
+      url: request.url ?? "",
+      authorization: request.headers.authorization,
+    });
+
+    if (request.method === "GET" && request.url === "/app/v1/merchant/payouts?merchantId=merchant-1") {
+      response.statusCode = 200;
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          statements: [
+            {
+              statementId: "stmt-1",
+              payoutBatchId: "batch-1",
+              entityType: "MERCHANT",
+              entityId: "merchant-1",
+              periodStart: "2026-02-01T00:00:00.000Z",
+              periodEnd: "2026-02-07T23:59:59.999Z",
+              currency: "USD",
+              totalAmount: 18250,
+              lineItems: [
+                {
+                  label: "Net payout",
+                  amount: 18250,
+                },
+              ],
+              format: "PDF",
+              renderedContent: "statement-content",
+              createdAt: "2026-02-08T03:00:00.000Z",
+            },
+          ],
+        }),
+      );
+      return;
+    }
+
+    response.statusCode = 404;
+    response.end();
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    backend.listen(0, "127.0.0.1", (error?: Error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+
+  try {
+    const address = backend.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind merchant payouts test backend");
+    }
+
+    const statements = await fetchMerchantPayoutStatements("merchant-1", {
+      opsBffBaseUrl: `http://127.0.0.1:${address.port}`,
+      appSessionToken: "session-token-1",
+    });
+
+    assert.equal(statements.length, 1);
+    assert.equal(statements[0]?.statementId, "stmt-1");
+    assert.equal(statements[0]?.totalAmount, 18250);
+    assert.equal(requests[0]?.method, "GET");
+    assert.equal(requests[0]?.url, "/app/v1/merchant/payouts?merchantId=merchant-1");
     assert.equal(requests[0]?.authorization, "Bearer session-token-1");
   } finally {
     await new Promise<void>((resolve, reject) => {
