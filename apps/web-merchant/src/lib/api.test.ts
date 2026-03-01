@@ -3,7 +3,12 @@ import { Buffer } from "node:buffer";
 import { createServer as createHttpServer } from "node:http";
 import test from "node:test";
 
-import { exchangeMerchantSession, fetchMerchantOrders, refreshMerchantSession } from "./api.js";
+import {
+  exchangeMerchantSession,
+  fetchMerchantFeatureFlags,
+  fetchMerchantOrders,
+  refreshMerchantSession,
+} from "./api.js";
 
 test("fetchMerchantOrders calls ops-bff merchant endpoint", async () => {
   const requests: Array<{ method: string; url: string; authorization?: string }> = [];
@@ -51,6 +56,90 @@ test("fetchMerchantOrders calls ops-bff merchant endpoint", async () => {
     assert.equal(orders[0]?.id, "order-1");
     assert.equal(requests[0]?.method, "GET");
     assert.equal(requests[0]?.url, "/app/v1/merchant/orders?merchantId=merchant-1");
+    assert.equal(requests[0]?.authorization, "Bearer session-token-1");
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      backend.close((error?: Error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+});
+
+test("fetchMerchantFeatureFlags calls ops-bff merchant feature-flags endpoint", async () => {
+  const requests: Array<{ method: string; url: string; authorization?: string }> = [];
+  const backend = createHttpServer((request, response) => {
+    requests.push({
+      method: request.method ?? "",
+      url: request.url ?? "",
+      authorization: request.headers.authorization,
+    });
+
+    if (
+      request.method === "GET" &&
+      request.url ===
+        "/app/v1/merchant/feature-flags?userId=merchant-user-1&role=merchant_operator&tenantId=metro-1"
+    ) {
+      response.statusCode = 200;
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          flags: {
+            "merchant.livePrepBoard": true,
+          },
+          ttlSeconds: 60,
+          generatedAtEpochMillis: 1700000000000,
+        }),
+      );
+      return;
+    }
+
+    response.statusCode = 404;
+    response.end();
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    backend.listen(0, "127.0.0.1", (error?: Error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+
+  try {
+    const address = backend.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Failed to bind merchant feature-flags test backend");
+    }
+
+    const snapshot = await fetchMerchantFeatureFlags(
+      {
+        userId: "merchant-user-1",
+        role: "merchant_operator",
+        tenantId: "metro-1",
+      },
+      {
+        opsBffBaseUrl: `http://127.0.0.1:${address.port}`,
+        appSessionToken: "session-token-1",
+      },
+    );
+
+    assert.equal(snapshot.flags["merchant.livePrepBoard"], true);
+    assert.equal(snapshot.ttlSeconds, 60);
+    assert.equal(snapshot.generatedAtEpochMillis, 1700000000000);
+    assert.equal(requests[0]?.method, "GET");
+    assert.equal(
+      requests[0]?.url,
+      "/app/v1/merchant/feature-flags?userId=merchant-user-1&role=merchant_operator&tenantId=metro-1",
+    );
     assert.equal(requests[0]?.authorization, "Bearer session-token-1");
   } finally {
     await new Promise<void>((resolve, reject) => {

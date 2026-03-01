@@ -3,6 +3,18 @@ export interface MerchantOrderView {
   status: string;
 }
 
+export interface MerchantFeatureFlagContext {
+  userId: string;
+  role: string;
+  tenantId?: string;
+}
+
+export interface MerchantFeatureFlagSnapshot {
+  flags: Record<string, boolean>;
+  ttlSeconds: number;
+  generatedAtEpochMillis: number;
+}
+
 export interface MerchantApiOptions {
   opsBffBaseUrl?: string;
   appSessionToken?: string;
@@ -84,6 +96,38 @@ export async function fetchMerchantOrders(
     id: order.id,
     status: order.status,
   }));
+}
+
+export async function fetchMerchantFeatureFlags(
+  context: MerchantFeatureFlagContext,
+  options?: MerchantApiOptions,
+): Promise<MerchantFeatureFlagSnapshot> {
+  const fetchImpl = options?.fetchImpl ?? fetch;
+  const baseUrl = resolveOpsBffBaseUrl(options);
+  const query = new URLSearchParams({
+    userId: context.userId,
+    role: context.role,
+  });
+  if (context.tenantId) {
+    query.set("tenantId", context.tenantId);
+  }
+
+  const headers = options?.appSessionToken
+    ? { authorization: `Bearer ${options.appSessionToken}` }
+    : undefined;
+  const response = await fetchImpl(`${baseUrl}/app/v1/merchant/feature-flags?${query.toString()}`, {
+    cache: "no-store",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error("OPS_BFF_MERCHANT_FEATURE_FLAGS_FETCH_FAILED");
+  }
+
+  return parseMerchantFeatureFlagSnapshot(
+    await response.json(),
+    "OPS_BFF_MERCHANT_FEATURE_FLAGS_INVALID_PAYLOAD",
+  );
 }
 
 export async function exchangeMerchantSession(
@@ -196,4 +240,49 @@ function asPositiveInteger(value: unknown, errorCode: string): number {
   }
 
   return value;
+}
+
+function parseMerchantFeatureFlagSnapshot(
+  payload: unknown,
+  invalidPayloadErrorCode: string,
+): MerchantFeatureFlagSnapshot {
+  if (typeof payload !== "object" || payload === null) {
+    throw new Error(invalidPayloadErrorCode);
+  }
+
+  const response = payload as {
+    flags?: unknown;
+    ttlSeconds?: unknown;
+    generatedAtEpochMillis?: unknown;
+  };
+  const flags = asBooleanFlagRecord(response.flags, invalidPayloadErrorCode);
+  const ttlSeconds = asPositiveInteger(response.ttlSeconds, invalidPayloadErrorCode);
+  const generatedAtEpochMillis = asPositiveInteger(
+    response.generatedAtEpochMillis,
+    invalidPayloadErrorCode,
+  );
+
+  return {
+    flags,
+    ttlSeconds,
+    generatedAtEpochMillis,
+  };
+}
+
+function asBooleanFlagRecord(value: unknown, errorCode: string): Record<string, boolean> {
+  if (typeof value !== "object" || value === null) {
+    throw new Error(errorCode);
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>);
+  const flags: Record<string, boolean> = {};
+  for (const [key, flagValue] of entries) {
+    if (typeof flagValue !== "boolean") {
+      throw new Error(errorCode);
+    }
+
+    flags[key] = flagValue;
+  }
+
+  return flags;
 }
