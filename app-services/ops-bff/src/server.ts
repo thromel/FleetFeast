@@ -1,14 +1,15 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 
 import {
   createAppSessionAuthServiceFromEnv,
   createOidcVerifierFromEnv,
   extractRolesFromClaims,
   mapAppAuthError,
+  type AppAccessTokenClaims,
   type AppSessionAuthService,
   type OidcVerifier,
 } from "@fleetfeast/app-auth";
-import type { AppRole } from "@fleetfeast/shared-contracts";
+import type { AppPersona, AppRole } from "@fleetfeast/shared-contracts";
 
 export interface MerchantOrderView {
   id: string;
@@ -178,6 +179,8 @@ export function createOpsCoreApiDependencies(
 }
 
 const ADMIN_ROLE_PRIORITY: AppRole[] = ["system_admin", "support_agent", "finance_ops"];
+const ADMIN_ALLOWED_ROLES: AppRole[] = ["system_admin", "support_agent", "finance_ops"];
+const MERCHANT_ALLOWED_ROLES: AppRole[] = ["merchant_operator"];
 
 function resolveMerchantRole(roles: string[]): AppRole | null {
   return roles.includes("merchant_operator") ? "merchant_operator" : null;
@@ -415,6 +418,14 @@ export function createOpsBffServer(dependencies: OpsBffDependencies): FastifyIns
   });
 
   app.get("/app/v1/merchant/orders", async (request, reply) => {
+    const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+      persona: "merchant",
+      allowedRoles: MERCHANT_ALLOWED_ROLES,
+    });
+    if (!claims) {
+      return;
+    }
+
     const query = request.query as { merchantId?: unknown };
     if (typeof query?.merchantId !== "string" || query.merchantId.trim().length === 0) {
       reply.status(400);
@@ -429,6 +440,14 @@ export function createOpsBffServer(dependencies: OpsBffDependencies): FastifyIns
   });
 
   app.get("/app/v1/merchant/payouts", async (request, reply) => {
+    const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+      persona: "merchant",
+      allowedRoles: MERCHANT_ALLOWED_ROLES,
+    });
+    if (!claims) {
+      return;
+    }
+
     const query = request.query as { merchantId?: unknown };
     if (typeof query?.merchantId !== "string" || query.merchantId.trim().length === 0) {
       reply.status(400);
@@ -443,6 +462,14 @@ export function createOpsBffServer(dependencies: OpsBffDependencies): FastifyIns
   });
 
   app.get("/app/v1/merchant/feature-flags", async (request, reply) => {
+    const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+      persona: "merchant",
+      allowedRoles: MERCHANT_ALLOWED_ROLES,
+    });
+    if (!claims) {
+      return;
+    }
+
     const query = request.query as { userId?: unknown; role?: unknown; tenantId?: unknown };
     if (
       typeof query?.userId !== "string" ||
@@ -462,6 +489,13 @@ export function createOpsBffServer(dependencies: OpsBffDependencies): FastifyIns
       return {
         errorCode: "INVALID_FEATURE_FLAG_QUERY",
         message: "tenantId must be a string when provided",
+      };
+    }
+    if (query.userId !== claims.userId || query.role !== claims.role) {
+      reply.status(403);
+      return {
+        errorCode: "APP_ROUTE_FORBIDDEN",
+        message: "Session claims do not match feature-flag query context",
       };
     }
 
@@ -472,16 +506,40 @@ export function createOpsBffServer(dependencies: OpsBffDependencies): FastifyIns
     });
   });
 
-  app.get("/app/v1/admin/incidents", async () => {
+  app.get("/app/v1/admin/incidents", async (request, reply) => {
+    const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+      persona: "admin",
+      allowedRoles: ADMIN_ALLOWED_ROLES,
+    });
+    if (!claims) {
+      return;
+    }
+
     const incidents = await dependencies.listAdminIncidents();
     return { incidents };
   });
 
-  app.get("/app/v1/admin/slo-dashboard", async () => {
+  app.get("/app/v1/admin/slo-dashboard", async (request, reply) => {
+    const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+      persona: "admin",
+      allowedRoles: ADMIN_ALLOWED_ROLES,
+    });
+    if (!claims) {
+      return;
+    }
+
     return dependencies.getAdminSloDashboard();
   });
 
   app.get("/app/v1/admin/feature-flags", async (request, reply) => {
+    const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+      persona: "admin",
+      allowedRoles: ADMIN_ALLOWED_ROLES,
+    });
+    if (!claims) {
+      return;
+    }
+
     const query = request.query as { userId?: unknown; role?: unknown; tenantId?: unknown };
     if (
       typeof query?.userId !== "string" ||
@@ -501,6 +559,13 @@ export function createOpsBffServer(dependencies: OpsBffDependencies): FastifyIns
       return {
         errorCode: "INVALID_FEATURE_FLAG_QUERY",
         message: "tenantId must be a string when provided",
+      };
+    }
+    if (query.userId !== claims.userId || query.role !== claims.role) {
+      reply.status(403);
+      return {
+        errorCode: "APP_ROUTE_FORBIDDEN",
+        message: "Session claims do not match feature-flag query context",
       };
     }
 
@@ -512,6 +577,48 @@ export function createOpsBffServer(dependencies: OpsBffDependencies): FastifyIns
   });
 
   return app;
+
+  async function authorizeDataRoute(
+    authorizationHeader: string | undefined,
+    reply: FastifyReply,
+    policy: {
+      persona: AppPersona;
+      allowedRoles: AppRole[];
+    },
+  ): Promise<AppAccessTokenClaims | null> {
+    const accessToken = extractBearerToken(authorizationHeader);
+    if (!accessToken) {
+      reply.status(401).send({
+        errorCode: "APP_ACCESS_TOKEN_REQUIRED",
+        message: "Bearer access token is required for app data routes",
+      });
+      return null;
+    }
+
+    try {
+      const claims = await dependencies.sessionAuth.verifyAccessToken(accessToken);
+      if (claims.persona !== policy.persona || !policy.allowedRoles.includes(claims.role)) {
+        reply.status(403).send({
+          errorCode: "APP_ROUTE_FORBIDDEN",
+          message: "Session token does not have access to this route",
+        });
+        return null;
+      }
+
+      return claims;
+    } catch (error: unknown) {
+      const mapped = mapAppAuthError(error);
+      if (mapped) {
+        reply.status(mapped.statusCode).send({
+          errorCode: mapped.errorCode,
+          message: mapped.message,
+        });
+        return null;
+      }
+
+      throw error;
+    }
+  }
 }
 
 export function createOpsBffServerFromEnv(): FastifyInstance {
@@ -554,4 +661,18 @@ function parseFeatureFlagsTtlSeconds(rawTtlSeconds: string | undefined): number 
   }
 
   return parsed;
+}
+
+function extractBearerToken(authorizationHeader: string | undefined): string | null {
+  if (!authorizationHeader) {
+    return null;
+  }
+
+  const prefix = "Bearer ";
+  if (!authorizationHeader.startsWith(prefix)) {
+    return null;
+  }
+
+  const token = authorizationHeader.slice(prefix.length).trim();
+  return token.length > 0 ? token : null;
 }

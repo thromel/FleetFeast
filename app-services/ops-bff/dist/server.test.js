@@ -2,11 +2,44 @@ import assert from "node:assert/strict";
 import { createServer as createHttpServer } from "node:http";
 import test from "node:test";
 import { createAppSessionAuthService, createDevOidcVerifier } from "@fleetfeast/app-auth";
-import { createOpsBffServer, createOpsCoreApiDependencies } from "./server.js";
+import { createOpsBffServer, createOpsCoreApiDependencies, } from "./server.js";
 function createTestOpsDependencies() {
     return {
         listMerchantOrders: async () => [{ id: "order-1", status: "MERCHANT_ACCEPTED" }],
+        listMerchantPayoutStatements: async () => [
+            {
+                statementId: "stmt-1",
+                payoutBatchId: "batch-1",
+                entityType: "MERCHANT",
+                entityId: "merchant-1",
+                periodStart: "2026-02-01T00:00:00.000Z",
+                periodEnd: "2026-02-07T23:59:59.999Z",
+                currency: "USD",
+                totalAmount: 18250,
+                lineItems: [
+                    {
+                        label: "Net payout",
+                        amount: 18250,
+                    },
+                ],
+                format: "PDF",
+                renderedContent: "statement-content",
+                createdAt: "2026-02-08T03:00:00.000Z",
+            },
+        ],
         listAdminIncidents: async () => [{ id: "incident-1", severity: "HIGH" }],
+        getAdminSloDashboard: async () => ({
+            availabilityPercent: 99.7,
+            checkoutP95Ms: 810,
+            timelineP95Ms: 430,
+            breaches: [
+                {
+                    type: "LATENCY_CHECKOUT",
+                    actual: 810,
+                    threshold: 700,
+                },
+            ],
+        }),
         getMerchantFeatureFlagSnapshot: async () => ({
             flags: {
                 "merchant.livePrepBoard": true,
@@ -109,7 +142,7 @@ test("ops-bff refresh endpoint rotates admin refresh token", async () => {
         await app.close();
     }
 });
-test("ops-bff serves merchant orders and admin incidents", async () => {
+test("ops-bff requires persona-scoped access token for merchant/admin data routes", async () => {
     const app = createOpsBffServer(createTestOpsDependencies());
     await app.listen({ port: 0, host: "127.0.0.1" });
     try {
@@ -117,33 +150,133 @@ test("ops-bff serves merchant orders and admin incidents", async () => {
         if (!address || typeof address === "string") {
             throw new Error("Failed to bind ops-bff test listener");
         }
-        const merchantResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/merchant/orders?merchantId=merchant-1`);
+        const merchantNoAuth = await fetch(`http://127.0.0.1:${address.port}/app/v1/merchant/orders?merchantId=merchant-1`);
+        assert.equal(merchantNoAuth.status, 401);
+        const merchantNoAuthPayload = (await merchantNoAuth.json());
+        assert.equal(merchantNoAuthPayload.errorCode, "APP_ACCESS_TOKEN_REQUIRED");
+        const merchantExchange = await fetch(`http://127.0.0.1:${address.port}/app/v1/merchant/session/exchange`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+                oidcToken: "dev:merchant-user-1:merchant-1@fleetfeast.dev:merchant_operator",
+                traceId: "trace-merchant-authz",
+            }),
+        });
+        assert.equal(merchantExchange.status, 200);
+        const merchantSession = (await merchantExchange.json());
+        const merchantWithAuth = await fetch(`http://127.0.0.1:${address.port}/app/v1/merchant/orders?merchantId=merchant-1`, {
+            headers: { authorization: `Bearer ${merchantSession.tokenPair.accessToken}` },
+        });
+        assert.equal(merchantWithAuth.status, 200);
+        const adminWithMerchantToken = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/incidents`, {
+            headers: { authorization: `Bearer ${merchantSession.tokenPair.accessToken}` },
+        });
+        assert.equal(adminWithMerchantToken.status, 403);
+        const adminWithMerchantTokenPayload = (await adminWithMerchantToken.json());
+        assert.equal(adminWithMerchantTokenPayload.errorCode, "APP_ROUTE_FORBIDDEN");
+        const adminExchange = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/session/exchange`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+                oidcToken: "dev:admin-user-1:admin-1@fleetfeast.dev:system_admin",
+                traceId: "trace-admin-authz",
+            }),
+        });
+        assert.equal(adminExchange.status, 200);
+        const adminSession = (await adminExchange.json());
+        const adminWithAuth = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/incidents`, {
+            headers: { authorization: `Bearer ${adminSession.tokenPair.accessToken}` },
+        });
+        assert.equal(adminWithAuth.status, 200);
+    }
+    finally {
+        await app.close();
+    }
+});
+test("ops-bff serves merchant orders, merchant payouts, admin incidents, and admin slo dashboard", async () => {
+    const dependencies = createTestOpsDependencies();
+    const merchantToken = (await dependencies.sessionAuth.issueSession({
+        userId: "merchant-1",
+        role: "merchant_operator",
+        persona: "merchant",
+        traceId: "trace-merchant-data",
+    })).tokenPair.accessToken;
+    const adminToken = (await dependencies.sessionAuth.issueSession({
+        userId: "admin-1",
+        role: "system_admin",
+        persona: "admin",
+        traceId: "trace-admin-data",
+    })).tokenPair.accessToken;
+    const app = createOpsBffServer(dependencies);
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    try {
+        const address = app.server.address();
+        if (!address || typeof address === "string") {
+            throw new Error("Failed to bind ops-bff test listener");
+        }
+        const merchantResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/merchant/orders?merchantId=merchant-1`, {
+            headers: { authorization: `Bearer ${merchantToken}` },
+        });
         assert.equal(merchantResponse.status, 200);
         const merchantPayload = (await merchantResponse.json());
         assert.equal(merchantPayload.orders[0]?.id, "order-1");
-        const adminResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/incidents`);
+        const payoutsResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/merchant/payouts?merchantId=merchant-1`, {
+            headers: { authorization: `Bearer ${merchantToken}` },
+        });
+        assert.equal(payoutsResponse.status, 200);
+        const payoutsPayload = (await payoutsResponse.json());
+        assert.equal(payoutsPayload.statements[0]?.statementId, "stmt-1");
+        assert.equal(payoutsPayload.statements[0]?.totalAmount, 18250);
+        const adminResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/incidents`, {
+            headers: { authorization: `Bearer ${adminToken}` },
+        });
         assert.equal(adminResponse.status, 200);
         const adminPayload = (await adminResponse.json());
         assert.equal(adminPayload.incidents[0]?.id, "incident-1");
+        const sloResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/slo-dashboard`, {
+            headers: { authorization: `Bearer ${adminToken}` },
+        });
+        assert.equal(sloResponse.status, 200);
+        const sloPayload = (await sloResponse.json());
+        assert.equal(sloPayload.availabilityPercent, 99.7);
+        assert.equal(sloPayload.checkoutP95Ms, 810);
+        assert.equal(sloPayload.breaches[0]?.type, "LATENCY_CHECKOUT");
     }
     finally {
         await app.close();
     }
 });
 test("ops-bff returns merchant and admin feature-flag snapshots", async () => {
-    const app = createOpsBffServer(createTestOpsDependencies());
+    const dependencies = createTestOpsDependencies();
+    const merchantToken = (await dependencies.sessionAuth.issueSession({
+        userId: "merchant-1",
+        role: "merchant_operator",
+        persona: "merchant",
+        traceId: "trace-merchant-flags",
+    })).tokenPair.accessToken;
+    const adminToken = (await dependencies.sessionAuth.issueSession({
+        userId: "admin-1",
+        role: "system_admin",
+        persona: "admin",
+        traceId: "trace-admin-flags",
+    })).tokenPair.accessToken;
+    const app = createOpsBffServer(dependencies);
     await app.listen({ port: 0, host: "127.0.0.1" });
     try {
         const address = app.server.address();
         if (!address || typeof address === "string") {
             throw new Error("Failed to bind ops-bff test listener");
         }
-        const merchantResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/merchant/feature-flags?userId=merchant-1&role=merchant_operator&tenantId=metro-1`);
+        const merchantResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/merchant/feature-flags?userId=merchant-1&role=merchant_operator&tenantId=metro-1`, {
+            headers: { authorization: `Bearer ${merchantToken}` },
+        });
         assert.equal(merchantResponse.status, 200);
         const merchantPayload = (await merchantResponse.json());
         assert.equal(merchantPayload.flags["merchant.livePrepBoard"], true);
         assert.equal(merchantPayload.ttlSeconds, 30);
-        const adminResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/feature-flags?userId=admin-1&role=system_admin&tenantId=metro-1`);
+        const adminResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/feature-flags?userId=admin-1&role=system_admin&tenantId=metro-1`, {
+            headers: { authorization: `Bearer ${adminToken}` },
+        });
         assert.equal(adminResponse.status, 200);
         const adminPayload = (await adminResponse.json());
         assert.equal(adminPayload.flags["admin.incidentWorkbenchV2"], false);
@@ -166,6 +299,34 @@ test("ops-bff core-api dependency calls merchant and observability endpoints", a
             response.end(JSON.stringify({ orders: [{ id: "order-backend-2", status: "READY" }] }));
             return;
         }
+        if (request.method === "GET" && request.url === "/api/v1/merchant/payouts?merchantId=merchant-2") {
+            response.statusCode = 200;
+            response.setHeader("content-type", "application/json");
+            response.end(JSON.stringify({
+                statements: [
+                    {
+                        statementId: "stmt-backend-2",
+                        payoutBatchId: "batch-backend-2",
+                        entityType: "MERCHANT",
+                        entityId: "merchant-2",
+                        periodStart: "2026-02-01T00:00:00.000Z",
+                        periodEnd: "2026-02-07T23:59:59.999Z",
+                        currency: "USD",
+                        totalAmount: 22400,
+                        lineItems: [
+                            {
+                                label: "Net payout",
+                                amount: 22400,
+                            },
+                        ],
+                        format: "PDF",
+                        renderedContent: "backend-statement",
+                        createdAt: "2026-02-08T03:00:00.000Z",
+                    },
+                ],
+            }));
+            return;
+        }
         if (request.method === "GET" && request.url === "/internal/observability/logs") {
             response.statusCode = 200;
             response.setHeader("content-type", "application/json");
@@ -176,6 +337,17 @@ test("ops-bff core-api dependency calls merchant and observability endpoints", a
                         statusCode: 503,
                     },
                 ],
+            }));
+            return;
+        }
+        if (request.method === "GET" && request.url === "/internal/observability/slo/dashboard") {
+            response.statusCode = 200;
+            response.setHeader("content-type", "application/json");
+            response.end(JSON.stringify({
+                availabilityPercent: 99.8,
+                checkoutP95Ms: 720,
+                timelineP95Ms: 440,
+                breaches: [],
             }));
             return;
         }
@@ -195,37 +367,73 @@ test("ops-bff core-api dependency calls merchant and observability endpoints", a
     if (!backendAddress || typeof backendAddress === "string") {
         throw new Error("Failed to bind ops backend stub");
     }
-    const app = createOpsBffServer({
+    const sessionAuth = createAppSessionAuthService({
+        jwtSecret: "fleetfeast-ops-bff-test-secret",
+    });
+    const merchantToken = (await sessionAuth.issueSession({
+        userId: "merchant-2",
+        role: "merchant_operator",
+        persona: "merchant",
+        traceId: "trace-merchant-core",
+    })).tokenPair.accessToken;
+    const adminToken = (await sessionAuth.issueSession({
+        userId: "admin-2",
+        role: "system_admin",
+        persona: "admin",
+        traceId: "trace-admin-core",
+    })).tokenPair.accessToken;
+    const appWithAuth = createOpsBffServer({
         ...createOpsCoreApiDependencies({
             coreApiBaseUrl: `http://127.0.0.1:${backendAddress.port}`,
         }),
         oidcVerifier: createDevOidcVerifier(),
-        sessionAuth: createAppSessionAuthService({
-            jwtSecret: "fleetfeast-ops-bff-test-secret",
-        }),
+        sessionAuth,
     });
-    await app.listen({ port: 0, host: "127.0.0.1" });
+    await appWithAuth.listen({ port: 0, host: "127.0.0.1" });
     try {
-        const address = app.server.address();
+        const address = appWithAuth.server.address();
         if (!address || typeof address === "string") {
             throw new Error("Failed to bind ops-bff listener");
         }
-        const merchantResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/merchant/orders?merchantId=merchant-2`);
+        const merchantResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/merchant/orders?merchantId=merchant-2`, {
+            headers: { authorization: `Bearer ${merchantToken}` },
+        });
         assert.equal(merchantResponse.status, 200);
         const merchantPayload = (await merchantResponse.json());
         assert.equal(merchantPayload.orders[0]?.id, "order-backend-2");
-        const adminResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/incidents`);
+        const payoutsResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/merchant/payouts?merchantId=merchant-2`, {
+            headers: { authorization: `Bearer ${merchantToken}` },
+        });
+        assert.equal(payoutsResponse.status, 200);
+        const payoutsPayload = (await payoutsResponse.json());
+        assert.equal(payoutsPayload.statements[0]?.statementId, "stmt-backend-2");
+        assert.equal(payoutsPayload.statements[0]?.totalAmount, 22400);
+        const adminResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/incidents`, {
+            headers: { authorization: `Bearer ${adminToken}` },
+        });
         assert.equal(adminResponse.status, 200);
         const adminPayload = (await adminResponse.json());
         assert.equal(adminPayload.incidents[0]?.id, "trace-incident-1");
         assert.equal(adminPayload.incidents[0]?.severity, "HIGH");
+        const sloResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/slo-dashboard`, {
+            headers: { authorization: `Bearer ${adminToken}` },
+        });
+        assert.equal(sloResponse.status, 200);
+        const sloPayload = (await sloResponse.json());
+        assert.equal(sloPayload.availabilityPercent, 99.8);
+        assert.equal(sloPayload.checkoutP95Ms, 720);
+        assert.equal(sloPayload.timelineP95Ms, 440);
         assert.equal(requests[0]?.method, "GET");
         assert.equal(requests[0]?.url, "/api/v1/merchant/orders?merchantId=merchant-2");
         assert.equal(requests[1]?.method, "GET");
-        assert.equal(requests[1]?.url, "/internal/observability/logs");
+        assert.equal(requests[1]?.url, "/api/v1/merchant/payouts?merchantId=merchant-2");
+        assert.equal(requests[2]?.method, "GET");
+        assert.equal(requests[2]?.url, "/internal/observability/logs");
+        assert.equal(requests[3]?.method, "GET");
+        assert.equal(requests[3]?.url, "/internal/observability/slo/dashboard");
     }
     finally {
-        await app.close();
+        await appWithAuth.close();
         await new Promise((resolve, reject) => {
             backend.close((error) => {
                 if (error) {

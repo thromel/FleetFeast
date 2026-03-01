@@ -21,10 +21,13 @@ export default async function MerchantPage() {
   const featureFlagRole =
     process.env.WEB_MERCHANT_FEATURE_FLAG_ROLE ?? sessionExchange?.session.role;
   const featureFlagTenantId = process.env.WEB_MERCHANT_FEATURE_FLAG_TENANT_ID;
-  const orders = await fetchMerchantOrders(merchantId, { appSessionToken });
-  const payoutStatements = await fetchMerchantPayoutStatements(merchantId, { appSessionToken });
+  const hasAppSession = typeof appSessionToken === "string" && appSessionToken.length > 0;
+  const orders = hasAppSession ? await fetchMerchantOrders(merchantId, { appSessionToken }) : [];
+  const payoutStatements = hasAppSession
+    ? await fetchMerchantPayoutStatements(merchantId, { appSessionToken })
+    : [];
   const featureFlags =
-    featureFlagUserId && featureFlagRole
+    hasAppSession && featureFlagUserId && featureFlagRole
       ? await fetchMerchantFeatureFlags(
           {
             userId: featureFlagUserId,
@@ -40,6 +43,11 @@ export default async function MerchantPage() {
       <section className="card">
         <h1 className="headline">Merchant Dispatch Desk</h1>
         <p className="meta">Live feed from ops-bff for merchant: {merchantId}</p>
+        {!hasAppSession ? (
+          <p className="meta">
+            App session required. Set `WEB_MERCHANT_APP_SESSION_TOKEN` or `WEB_MERCHANT_OIDC_TOKEN`.
+          </p>
+        ) : null}
         <ul className="list">
           {orders.map((order) => (
             <li key={order.id} className="item">

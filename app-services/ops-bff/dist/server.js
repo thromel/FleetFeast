@@ -33,6 +33,22 @@ export function createOpsCoreApiDependencies(options) {
                 severity: log.statusCode >= 500 ? "HIGH" : "LOW",
             }));
         },
+        async getAdminSloDashboard() {
+            const response = await fetchImpl(`${baseUrl}/internal/observability/slo/dashboard`);
+            if (!response.ok) {
+                throw new Error("CORE_API_SLO_DASHBOARD_FETCH_FAILED");
+            }
+            const payload = (await response.json());
+            return payload;
+        },
+        async listMerchantPayoutStatements(merchantId) {
+            const response = await fetchImpl(`${baseUrl}/api/v1/merchant/payouts?merchantId=${encodeURIComponent(merchantId)}`);
+            if (!response.ok) {
+                throw new Error("CORE_API_MERCHANT_PAYOUTS_FETCH_FAILED");
+            }
+            const payload = (await response.json());
+            return payload.statements ?? [];
+        },
         async getMerchantFeatureFlagSnapshot() {
             return {
                 flags: merchantFlags,
@@ -50,6 +66,8 @@ export function createOpsCoreApiDependencies(options) {
     };
 }
 const ADMIN_ROLE_PRIORITY = ["system_admin", "support_agent", "finance_ops"];
+const ADMIN_ALLOWED_ROLES = ["system_admin", "support_agent", "finance_ops"];
+const MERCHANT_ALLOWED_ROLES = ["merchant_operator"];
 function resolveMerchantRole(roles) {
     return roles.includes("merchant_operator") ? "merchant_operator" : null;
 }
@@ -240,6 +258,13 @@ export function createOpsBffServer(dependencies) {
         }
     });
     app.get("/app/v1/merchant/orders", async (request, reply) => {
+        const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+            persona: "merchant",
+            allowedRoles: MERCHANT_ALLOWED_ROLES,
+        });
+        if (!claims) {
+            return;
+        }
         const query = request.query;
         if (typeof query?.merchantId !== "string" || query.merchantId.trim().length === 0) {
             reply.status(400);
@@ -251,7 +276,33 @@ export function createOpsBffServer(dependencies) {
         const orders = await dependencies.listMerchantOrders(query.merchantId);
         return { orders };
     });
+    app.get("/app/v1/merchant/payouts", async (request, reply) => {
+        const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+            persona: "merchant",
+            allowedRoles: MERCHANT_ALLOWED_ROLES,
+        });
+        if (!claims) {
+            return;
+        }
+        const query = request.query;
+        if (typeof query?.merchantId !== "string" || query.merchantId.trim().length === 0) {
+            reply.status(400);
+            return {
+                errorCode: "INVALID_MERCHANT_QUERY",
+                message: "merchantId query is required",
+            };
+        }
+        const statements = await dependencies.listMerchantPayoutStatements(query.merchantId);
+        return { statements };
+    });
     app.get("/app/v1/merchant/feature-flags", async (request, reply) => {
+        const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+            persona: "merchant",
+            allowedRoles: MERCHANT_ALLOWED_ROLES,
+        });
+        if (!claims) {
+            return;
+        }
         const query = request.query;
         if (typeof query?.userId !== "string" ||
             query.userId.trim().length === 0 ||
@@ -268,6 +319,13 @@ export function createOpsBffServer(dependencies) {
             return {
                 errorCode: "INVALID_FEATURE_FLAG_QUERY",
                 message: "tenantId must be a string when provided",
+            };
+        }
+        if (query.userId !== claims.userId || query.role !== claims.role) {
+            reply.status(403);
+            return {
+                errorCode: "APP_ROUTE_FORBIDDEN",
+                message: "Session claims do not match feature-flag query context",
             };
         }
         return dependencies.getMerchantFeatureFlagSnapshot({
@@ -276,11 +334,35 @@ export function createOpsBffServer(dependencies) {
             tenantId: query.tenantId,
         });
     });
-    app.get("/app/v1/admin/incidents", async () => {
+    app.get("/app/v1/admin/incidents", async (request, reply) => {
+        const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+            persona: "admin",
+            allowedRoles: ADMIN_ALLOWED_ROLES,
+        });
+        if (!claims) {
+            return;
+        }
         const incidents = await dependencies.listAdminIncidents();
         return { incidents };
     });
+    app.get("/app/v1/admin/slo-dashboard", async (request, reply) => {
+        const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+            persona: "admin",
+            allowedRoles: ADMIN_ALLOWED_ROLES,
+        });
+        if (!claims) {
+            return;
+        }
+        return dependencies.getAdminSloDashboard();
+    });
     app.get("/app/v1/admin/feature-flags", async (request, reply) => {
+        const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+            persona: "admin",
+            allowedRoles: ADMIN_ALLOWED_ROLES,
+        });
+        if (!claims) {
+            return;
+        }
         const query = request.query;
         if (typeof query?.userId !== "string" ||
             query.userId.trim().length === 0 ||
@@ -297,6 +379,13 @@ export function createOpsBffServer(dependencies) {
             return {
                 errorCode: "INVALID_FEATURE_FLAG_QUERY",
                 message: "tenantId must be a string when provided",
+            };
+        }
+        if (query.userId !== claims.userId || query.role !== claims.role) {
+            reply.status(403);
+            return {
+                errorCode: "APP_ROUTE_FORBIDDEN",
+                message: "Session claims do not match feature-flag query context",
             };
         }
         return dependencies.getAdminFeatureFlagSnapshot({
@@ -306,6 +395,38 @@ export function createOpsBffServer(dependencies) {
         });
     });
     return app;
+    async function authorizeDataRoute(authorizationHeader, reply, policy) {
+        const accessToken = extractBearerToken(authorizationHeader);
+        if (!accessToken) {
+            reply.status(401).send({
+                errorCode: "APP_ACCESS_TOKEN_REQUIRED",
+                message: "Bearer access token is required for app data routes",
+            });
+            return null;
+        }
+        try {
+            const claims = await dependencies.sessionAuth.verifyAccessToken(accessToken);
+            if (claims.persona !== policy.persona || !policy.allowedRoles.includes(claims.role)) {
+                reply.status(403).send({
+                    errorCode: "APP_ROUTE_FORBIDDEN",
+                    message: "Session token does not have access to this route",
+                });
+                return null;
+            }
+            return claims;
+        }
+        catch (error) {
+            const mapped = mapAppAuthError(error);
+            if (mapped) {
+                reply.status(mapped.statusCode).send({
+                    errorCode: mapped.errorCode,
+                    message: mapped.message,
+                });
+                return null;
+            }
+            throw error;
+        }
+    }
 }
 export function createOpsBffServerFromEnv() {
     return createOpsBffServer({
@@ -340,5 +461,16 @@ function parseFeatureFlagsTtlSeconds(rawTtlSeconds) {
         return 30;
     }
     return parsed;
+}
+function extractBearerToken(authorizationHeader) {
+    if (!authorizationHeader) {
+        return null;
+    }
+    const prefix = "Bearer ";
+    if (!authorizationHeader.startsWith(prefix)) {
+        return null;
+    }
+    const token = authorizationHeader.slice(prefix.length).trim();
+    return token.length > 0 ? token : null;
 }
 //# sourceMappingURL=server.js.map
