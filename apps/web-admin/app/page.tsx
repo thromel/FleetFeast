@@ -1,5 +1,5 @@
 import { createAdminAuthSessionManager } from "../src/lib/auth-session-manager";
-import { fetchAdminFeatureFlags, fetchAdminIncidents } from "../src/lib/api";
+import { fetchAdminFeatureFlags, fetchAdminIncidents, fetchAdminSloDashboard } from "../src/lib/api";
 
 export default async function AdminPage() {
   const sessionExchange = process.env.WEB_ADMIN_OIDC_TOKEN
@@ -15,6 +15,7 @@ export default async function AdminPage() {
   const featureFlagRole = process.env.WEB_ADMIN_FEATURE_FLAG_ROLE ?? sessionExchange?.session.role;
   const featureFlagTenantId = process.env.WEB_ADMIN_FEATURE_FLAG_TENANT_ID;
   const incidents = await fetchAdminIncidents({ appSessionToken });
+  const sloDashboard = await fetchAdminSloDashboard({ appSessionToken });
   const featureFlags =
     featureFlagUserId && featureFlagRole
       ? await fetchAdminFeatureFlags(
@@ -37,6 +38,29 @@ export default async function AdminPage() {
             <li key={incident.id} className="item">
               <span>{incident.id}</span>
               <span className="chip">{incident.severity}</span>
+            </li>
+          ))}
+        </ul>
+        <h2 className="headline">SLO Dashboard</h2>
+        <ul className="list">
+          <li className="item">
+            <span>Availability</span>
+            <span className="chip">{sloDashboard.availabilityPercent.toFixed(2)}%</span>
+          </li>
+          <li className="item">
+            <span>Checkout P95</span>
+            <span className="chip">{sloDashboard.checkoutP95Ms}ms</span>
+          </li>
+          <li className="item">
+            <span>Timeline P95</span>
+            <span className="chip">{sloDashboard.timelineP95Ms}ms</span>
+          </li>
+          {sloDashboard.breaches.map((breach, index) => (
+            <li key={`${breach.type}-${index}`} className="item">
+              <span>{breach.type}</span>
+              <span className="chip">
+                {breach.actual} / {breach.threshold}
+              </span>
             </li>
           ))}
         </ul>

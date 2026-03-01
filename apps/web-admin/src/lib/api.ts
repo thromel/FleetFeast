@@ -3,6 +3,19 @@ export interface AdminIncidentView {
   severity: string;
 }
 
+export interface AdminSloBreachView {
+  type: "AVAILABILITY" | "LATENCY_CHECKOUT" | "LATENCY_TIMELINE";
+  actual: number;
+  threshold: number;
+}
+
+export interface AdminSloDashboardView {
+  availabilityPercent: number;
+  checkoutP95Ms: number;
+  timelineP95Ms: number;
+  breaches: AdminSloBreachView[];
+}
+
 export interface AdminFeatureFlagContext {
   userId: string;
   role: string;
@@ -126,6 +139,26 @@ export async function fetchAdminFeatureFlags(
   );
 }
 
+export async function fetchAdminSloDashboard(
+  options?: AdminApiOptions,
+): Promise<AdminSloDashboardView> {
+  const fetchImpl = options?.fetchImpl ?? fetch;
+  const baseUrl = resolveOpsBffBaseUrl(options);
+  const headers = options?.appSessionToken
+    ? { authorization: `Bearer ${options.appSessionToken}` }
+    : undefined;
+  const response = await fetchImpl(`${baseUrl}/app/v1/admin/slo-dashboard`, {
+    cache: "no-store",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error("OPS_BFF_ADMIN_SLO_DASHBOARD_FETCH_FAILED");
+  }
+
+  return parseAdminSloDashboard(await response.json(), "OPS_BFF_ADMIN_SLO_DASHBOARD_INVALID_PAYLOAD");
+}
+
 export async function exchangeAdminSession(
   request: AdminSessionExchangeRequest,
   options?: AdminApiOptions,
@@ -238,6 +271,14 @@ function asPositiveInteger(value: unknown, errorCode: string): number {
   return value;
 }
 
+function asFiniteNumber(value: unknown, errorCode: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(errorCode);
+  }
+
+  return value;
+}
+
 function parseAdminFeatureFlagSnapshot(
   payload: unknown,
   invalidPayloadErrorCode: string,
@@ -281,4 +322,57 @@ function asBooleanFlagRecord(value: unknown, errorCode: string): Record<string, 
   }
 
   return flags;
+}
+
+function parseAdminSloDashboard(
+  payload: unknown,
+  invalidPayloadErrorCode: string,
+): AdminSloDashboardView {
+  if (typeof payload !== "object" || payload === null) {
+    throw new Error(invalidPayloadErrorCode);
+  }
+
+  const response = payload as {
+    availabilityPercent?: unknown;
+    checkoutP95Ms?: unknown;
+    timelineP95Ms?: unknown;
+    breaches?: unknown;
+  };
+  if (!Array.isArray(response.breaches)) {
+    throw new Error(invalidPayloadErrorCode);
+  }
+
+  const breaches = response.breaches.map((breach) => parseAdminSloBreach(breach, invalidPayloadErrorCode));
+
+  return {
+    availabilityPercent: asFiniteNumber(response.availabilityPercent, invalidPayloadErrorCode),
+    checkoutP95Ms: asFiniteNumber(response.checkoutP95Ms, invalidPayloadErrorCode),
+    timelineP95Ms: asFiniteNumber(response.timelineP95Ms, invalidPayloadErrorCode),
+    breaches,
+  };
+}
+
+function parseAdminSloBreach(
+  payload: unknown,
+  invalidPayloadErrorCode: string,
+): AdminSloBreachView {
+  if (typeof payload !== "object" || payload === null) {
+    throw new Error(invalidPayloadErrorCode);
+  }
+
+  const response = payload as {
+    type?: unknown;
+    actual?: unknown;
+    threshold?: unknown;
+  };
+  const type = asNonEmptyString(response.type, invalidPayloadErrorCode);
+  if (type !== "AVAILABILITY" && type !== "LATENCY_CHECKOUT" && type !== "LATENCY_TIMELINE") {
+    throw new Error(invalidPayloadErrorCode);
+  }
+
+  return {
+    type,
+    actual: asFiniteNumber(response.actual, invalidPayloadErrorCode),
+    threshold: asFiniteNumber(response.threshold, invalidPayloadErrorCode),
+  };
 }

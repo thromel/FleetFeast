@@ -35,6 +35,18 @@ function createTestOpsDependencies(): OpsBffDependencies {
       },
     ],
     listAdminIncidents: async () => [{ id: "incident-1", severity: "HIGH" }],
+    getAdminSloDashboard: async () => ({
+      availabilityPercent: 99.7,
+      checkoutP95Ms: 810,
+      timelineP95Ms: 430,
+      breaches: [
+        {
+          type: "LATENCY_CHECKOUT",
+          actual: 810,
+          threshold: 700,
+        },
+      ],
+    }),
     getMerchantFeatureFlagSnapshot: async () => ({
       flags: {
         "merchant.livePrepBoard": true,
@@ -168,7 +180,7 @@ test("ops-bff refresh endpoint rotates admin refresh token", async () => {
   }
 });
 
-test("ops-bff serves merchant orders, merchant payouts, and admin incidents", async () => {
+test("ops-bff serves merchant orders, merchant payouts, admin incidents, and admin slo dashboard", async () => {
   const app = createOpsBffServer(createTestOpsDependencies());
   await app.listen({ port: 0, host: "127.0.0.1" });
 
@@ -203,6 +215,18 @@ test("ops-bff serves merchant orders, merchant payouts, and admin incidents", as
       incidents: Array<{ id: string }>;
     };
     assert.equal(adminPayload.incidents[0]?.id, "incident-1");
+
+    const sloResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/slo-dashboard`);
+    assert.equal(sloResponse.status, 200);
+    const sloPayload = (await sloResponse.json()) as {
+      availabilityPercent: number;
+      checkoutP95Ms: number;
+      timelineP95Ms: number;
+      breaches: Array<{ type: string }>;
+    };
+    assert.equal(sloPayload.availabilityPercent, 99.7);
+    assert.equal(sloPayload.checkoutP95Ms, 810);
+    assert.equal(sloPayload.breaches[0]?.type, "LATENCY_CHECKOUT");
   } finally {
     await app.close();
   }
@@ -308,6 +332,20 @@ test("ops-bff core-api dependency calls merchant and observability endpoints", a
       return;
     }
 
+    if (request.method === "GET" && request.url === "/internal/observability/slo/dashboard") {
+      response.statusCode = 200;
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          availabilityPercent: 99.8,
+          checkoutP95Ms: 720,
+          timelineP95Ms: 440,
+          breaches: [],
+        }),
+      );
+      return;
+    }
+
     response.statusCode = 404;
     response.end();
   });
@@ -372,12 +410,26 @@ test("ops-bff core-api dependency calls merchant and observability endpoints", a
     assert.equal(adminPayload.incidents[0]?.id, "trace-incident-1");
     assert.equal(adminPayload.incidents[0]?.severity, "HIGH");
 
+    const sloResponse = await fetch(`http://127.0.0.1:${address.port}/app/v1/admin/slo-dashboard`);
+    assert.equal(sloResponse.status, 200);
+    const sloPayload = (await sloResponse.json()) as {
+      availabilityPercent: number;
+      checkoutP95Ms: number;
+      timelineP95Ms: number;
+      breaches: unknown[];
+    };
+    assert.equal(sloPayload.availabilityPercent, 99.8);
+    assert.equal(sloPayload.checkoutP95Ms, 720);
+    assert.equal(sloPayload.timelineP95Ms, 440);
+
     assert.equal(requests[0]?.method, "GET");
     assert.equal(requests[0]?.url, "/api/v1/merchant/orders?merchantId=merchant-2");
     assert.equal(requests[1]?.method, "GET");
     assert.equal(requests[1]?.url, "/api/v1/merchant/payouts?merchantId=merchant-2");
     assert.equal(requests[2]?.method, "GET");
     assert.equal(requests[2]?.url, "/internal/observability/logs");
+    assert.equal(requests[3]?.method, "GET");
+    assert.equal(requests[3]?.url, "/internal/observability/slo/dashboard");
   } finally {
     await app.close();
     await new Promise<void>((resolve, reject) => {

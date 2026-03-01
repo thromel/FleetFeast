@@ -40,6 +40,19 @@ export interface AdminIncidentView {
   severity: string;
 }
 
+export interface AdminSloBreachView {
+  type: "AVAILABILITY" | "LATENCY_CHECKOUT" | "LATENCY_TIMELINE";
+  actual: number;
+  threshold: number;
+}
+
+export interface AdminSloDashboardView {
+  availabilityPercent: number;
+  checkoutP95Ms: number;
+  timelineP95Ms: number;
+  breaches: AdminSloBreachView[];
+}
+
 export interface OpsFeatureFlagContext {
   userId: string;
   role: string;
@@ -56,6 +69,7 @@ export interface OpsBffDependencies {
   listMerchantOrders(merchantId: string): Promise<MerchantOrderView[]>;
   listMerchantPayoutStatements(merchantId: string): Promise<MerchantPayoutStatementView[]>;
   listAdminIncidents(): Promise<AdminIncidentView[]>;
+  getAdminSloDashboard(): Promise<AdminSloDashboardView>;
   getMerchantFeatureFlagSnapshot(context: OpsFeatureFlagContext): Promise<OpsFeatureFlagSnapshot>;
   getAdminFeatureFlagSnapshot(context: OpsFeatureFlagContext): Promise<OpsFeatureFlagSnapshot>;
   oidcVerifier: OidcVerifier;
@@ -74,6 +88,7 @@ export function createOpsCoreApiDependencies(
   | "listMerchantOrders"
   | "listMerchantPayoutStatements"
   | "listAdminIncidents"
+  | "getAdminSloDashboard"
   | "getMerchantFeatureFlagSnapshot"
   | "getAdminFeatureFlagSnapshot"
 > {
@@ -119,6 +134,15 @@ export function createOpsCoreApiDependencies(
         id: log.traceId,
         severity: log.statusCode >= 500 ? "HIGH" : "LOW",
       }));
+    },
+    async getAdminSloDashboard(): Promise<AdminSloDashboardView> {
+      const response = await fetchImpl(`${baseUrl}/internal/observability/slo/dashboard`);
+      if (!response.ok) {
+        throw new Error("CORE_API_SLO_DASHBOARD_FETCH_FAILED");
+      }
+
+      const payload = (await response.json()) as AdminSloDashboardView;
+      return payload;
     },
     async listMerchantPayoutStatements(
       merchantId: string,
@@ -451,6 +475,10 @@ export function createOpsBffServer(dependencies: OpsBffDependencies): FastifyIns
   app.get("/app/v1/admin/incidents", async () => {
     const incidents = await dependencies.listAdminIncidents();
     return { incidents };
+  });
+
+  app.get("/app/v1/admin/slo-dashboard", async () => {
+    return dependencies.getAdminSloDashboard();
   });
 
   app.get("/app/v1/admin/feature-flags", async (request, reply) => {
