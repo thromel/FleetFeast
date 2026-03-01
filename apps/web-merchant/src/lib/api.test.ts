@@ -130,7 +130,7 @@ test("exchangeMerchantSession posts to ops-bff session exchange endpoint", async
       throw new Error("Failed to bind merchant test backend");
     }
 
-    const accessToken = await exchangeMerchantSession(
+    const sessionExchange = await exchangeMerchantSession(
       {
         oidcToken: "dev:merchant-user-1:merchant@fleetfeast.dev:merchant_operator",
         traceId: "trace-1",
@@ -141,7 +141,7 @@ test("exchangeMerchantSession posts to ops-bff session exchange endpoint", async
       },
     );
 
-    assert.equal(accessToken, "access-1");
+    assert.equal(sessionExchange.tokenPair.accessToken, "access-1");
     assert.equal(requests[0]?.method, "POST");
     assert.equal(requests[0]?.url, "/app/v1/merchant/session/exchange");
     assert.match(requests[0]?.body ?? "", /"oidcToken":"dev:merchant-user-1:merchant@fleetfeast\.dev:merchant_operator"/);
@@ -224,7 +224,7 @@ test("refreshMerchantSession posts to ops-bff session refresh endpoint", async (
       throw new Error("Failed to bind merchant test backend");
     }
 
-    const accessToken = await refreshMerchantSession(
+    const refreshedSession = await refreshMerchantSession(
       {
         refreshToken: "refresh-1",
         traceId: "trace-2",
@@ -235,7 +235,7 @@ test("refreshMerchantSession posts to ops-bff session refresh endpoint", async (
       },
     );
 
-    assert.equal(accessToken, "access-2");
+    assert.equal(refreshedSession.tokenPair.accessToken, "access-2");
     assert.equal(requests[0]?.method, "POST");
     assert.equal(requests[0]?.url, "/app/v1/merchant/session/refresh");
     assert.match(requests[0]?.body ?? "", /"refreshToken":"refresh-1"/);

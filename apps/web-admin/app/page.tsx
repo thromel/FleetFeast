@@ -1,14 +1,17 @@
-import { exchangeAdminSession, fetchAdminIncidents } from "../src/lib/api";
+import { createAdminAuthSessionManager } from "../src/lib/auth-session-manager";
+import { fetchAdminIncidents } from "../src/lib/api";
 
 export default async function AdminPage() {
   const appSessionToken =
     process.env.WEB_ADMIN_APP_SESSION_TOKEN ??
     (process.env.WEB_ADMIN_OIDC_TOKEN
-      ? await exchangeAdminSession({
-          oidcToken: process.env.WEB_ADMIN_OIDC_TOKEN,
-          traceId: `web-admin-${Date.now()}`,
-          deviceId: "web-admin",
-        })
+      ? (
+          await createAdminAuthSessionManager().signIn({
+            oidcToken: process.env.WEB_ADMIN_OIDC_TOKEN,
+            traceId: `web-admin-${Date.now()}`,
+            deviceId: "web-admin",
+          })
+        ).tokenPair.accessToken
       : undefined);
   const incidents = await fetchAdminIncidents({ appSessionToken });
 
