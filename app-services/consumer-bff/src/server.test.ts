@@ -19,9 +19,15 @@ function createTestConsumerDependencies(
     ttlSeconds: 30,
     generatedAtEpochMillis: 1_735_681_200_000,
   }),
+  quickCreateOrder: () => Promise<{ id: string; status: string; timelineVersion: number }> = async () => ({
+    id: "order-quick-default",
+    status: "CREATED",
+    timelineVersion: 0,
+  }),
 ) {
   return {
     getOrderById,
+    quickCreateOrder: async () => quickCreateOrder(),
     getFeatureFlagSnapshot,
     oidcVerifier: createDevOidcVerifier(),
     sessionAuth: createAppSessionAuthService({

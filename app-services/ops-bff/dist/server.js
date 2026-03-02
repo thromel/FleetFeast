@@ -11,6 +11,36 @@ export function createOpsCoreApiDependencies(options) {
     });
     const ttlSeconds = parseFeatureFlagsTtlSeconds(process.env.OPS_FEATURE_FLAGS_TTL_SECONDS);
     return {
+        async acceptMerchantOrder(orderId) {
+            const response = await fetchImpl(`${baseUrl}/api/v1/merchant/orders/${encodeURIComponent(orderId)}/accept`, {
+                method: "POST",
+            });
+            if (!response.ok) {
+                throw new Error("CORE_API_MERCHANT_ORDER_ACCEPT_FAILED");
+            }
+            const payload = (await response.json());
+            return {
+                id: payload.id,
+                status: payload.status,
+            };
+        },
+        async requestDispatchAssignment(orderId, input) {
+            const response = await fetchImpl(`${baseUrl}/internal/orders/${encodeURIComponent(orderId)}/request-dispatch`, {
+                method: "POST",
+                headers: {
+                    "content-type": "application/json",
+                },
+                body: JSON.stringify(input ?? {}),
+            });
+            if (!response.ok) {
+                throw new Error("CORE_API_DISPATCH_REQUEST_FAILED");
+            }
+            const payload = (await response.json());
+            return {
+                id: payload.id,
+                status: payload.status,
+            };
+        },
         async listMerchantOrders(merchantId) {
             const response = await fetchImpl(`${baseUrl}/api/v1/merchant/orders?merchantId=${encodeURIComponent(merchantId)}`);
             if (!response.ok) {
@@ -264,6 +294,52 @@ export function createOpsBffServer(dependencies) {
             }
             throw error;
         }
+    });
+    app.post("/app/v1/merchant/orders/:orderId/accept", async (request, reply) => {
+        const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+            persona: "merchant",
+            allowedRoles: MERCHANT_ALLOWED_ROLES,
+        });
+        if (!claims) {
+            return;
+        }
+        const params = request.params;
+        if (typeof params?.orderId !== "string" || params.orderId.trim().length === 0) {
+            reply.status(400);
+            return {
+                errorCode: "INVALID_MERCHANT_ORDER_ROUTE_PARAM",
+                message: "orderId route param is required",
+            };
+        }
+        const order = await dependencies.acceptMerchantOrder(params.orderId);
+        return { order };
+    });
+    app.post("/app/v1/merchant/orders/:orderId/request-dispatch", async (request, reply) => {
+        const claims = await authorizeDataRoute(request.headers.authorization, reply, {
+            persona: "merchant",
+            allowedRoles: MERCHANT_ALLOWED_ROLES,
+        });
+        if (!claims) {
+            return;
+        }
+        const params = request.params;
+        if (typeof params?.orderId !== "string" || params.orderId.trim().length === 0) {
+            reply.status(400);
+            return {
+                errorCode: "INVALID_MERCHANT_ORDER_ROUTE_PARAM",
+                message: "orderId route param is required",
+            };
+        }
+        const payload = request.body;
+        if (payload !== undefined && (typeof payload !== "object" || payload === null)) {
+            reply.status(400);
+            return {
+                errorCode: "INVALID_DISPATCH_REQUEST_PAYLOAD",
+                message: "dispatch payload must be a JSON object when provided",
+            };
+        }
+        const order = await dependencies.requestDispatchAssignment(params.orderId, payload);
+        return { order };
     });
     app.get("/app/v1/merchant/orders", async (request, reply) => {
         const claims = await authorizeDataRoute(request.headers.authorization, reply, {

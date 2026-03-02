@@ -4,6 +4,18 @@ export interface MerchantOrderView {
     id: string;
     status: string;
 }
+export interface DispatchAssignmentCandidateInput {
+    courierId: string;
+    distanceMeters: number;
+    available: boolean;
+    activeOrders: number;
+    withinRestWindow: boolean;
+}
+export interface RequestDispatchAssignmentInput {
+    candidates: DispatchAssignmentCandidateInput[];
+    slaPressure: number;
+    merchantSelfDeliveryEnabled: boolean;
+}
 export interface MerchantPayoutStatementLineItemView {
     label: string;
     amount: number;
@@ -61,6 +73,8 @@ export interface OpsFeatureFlagSnapshot {
 }
 export interface OpsBffDependencies {
     listMerchantOrders(merchantId: string): Promise<MerchantOrderView[]>;
+    acceptMerchantOrder(orderId: string): Promise<MerchantOrderView>;
+    requestDispatchAssignment(orderId: string, input?: RequestDispatchAssignmentInput): Promise<MerchantOrderView>;
     listMerchantPayoutStatements(merchantId: string): Promise<MerchantPayoutStatementView[]>;
     listAdminIncidents(): Promise<AdminIncidentView[]>;
     listAdminComplianceAuditEvents(): Promise<AdminComplianceAuditEventView[]>;
@@ -74,6 +88,6 @@ export interface OpsCoreApiDependencyOptions {
     coreApiBaseUrl: string;
     fetchImpl?: typeof fetch;
 }
-export declare function createOpsCoreApiDependencies(options: OpsCoreApiDependencyOptions): Pick<OpsBffDependencies, "listMerchantOrders" | "listMerchantPayoutStatements" | "listAdminIncidents" | "listAdminComplianceAuditEvents" | "getAdminSloDashboard" | "getMerchantFeatureFlagSnapshot" | "getAdminFeatureFlagSnapshot">;
+export declare function createOpsCoreApiDependencies(options: OpsCoreApiDependencyOptions): Pick<OpsBffDependencies, "acceptMerchantOrder" | "requestDispatchAssignment" | "listMerchantOrders" | "listMerchantPayoutStatements" | "listAdminIncidents" | "listAdminComplianceAuditEvents" | "getAdminSloDashboard" | "getMerchantFeatureFlagSnapshot" | "getAdminFeatureFlagSnapshot">;
 export declare function createOpsBffServer(dependencies: OpsBffDependencies): FastifyInstance;
 export declare function createOpsBffServerFromEnv(): FastifyInstance;

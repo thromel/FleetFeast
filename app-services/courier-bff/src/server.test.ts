@@ -19,9 +19,48 @@ function createTestCourierDependencies(
     ttlSeconds: 30,
     generatedAtEpochMillis: 1_735_680_900_000,
   }),
+  acceptJob: (
+    jobId: string,
+    courierId: string,
+  ) => Promise<{ jobId: string; orderId: string; status: string; courierId?: string | null }> = async (
+    jobId: string,
+    courierId: string,
+  ) => ({
+    jobId,
+    orderId: jobId,
+    status: "ACCEPTED",
+    courierId,
+  }),
+  pickupJob: (
+    jobId: string,
+    courierId: string,
+  ) => Promise<{ jobId: string; orderId: string; status: string; courierId?: string | null }> = async (
+    jobId: string,
+    courierId: string,
+  ) => ({
+    jobId,
+    orderId: jobId,
+    status: "PICKED_UP",
+    courierId,
+  }),
+  dropoffJob: (
+    jobId: string,
+    courierId: string,
+  ) => Promise<{ jobId: string; orderId: string; status: string; courierId?: string | null }> = async (
+    jobId: string,
+    courierId: string,
+  ) => ({
+    jobId,
+    orderId: jobId,
+    status: "DROPPED_OFF",
+    courierId,
+  }),
 ) {
   return {
     listAvailableJobs,
+    acceptJob,
+    pickupJob,
+    dropoffJob,
     getFeatureFlagSnapshot,
     oidcVerifier: createDevOidcVerifier(),
     sessionAuth: createAppSessionAuthService({

@@ -13,6 +13,14 @@ import {
 function createTestOpsDependencies(): OpsBffDependencies {
   return {
     listMerchantOrders: async () => [{ id: "order-1", status: "MERCHANT_ACCEPTED" }],
+    acceptMerchantOrder: async (orderId: string) => ({
+      id: orderId,
+      status: "MERCHANT_ACCEPTED",
+    }),
+    requestDispatchAssignment: async (orderId: string) => ({
+      id: orderId,
+      status: "DISPATCH_PENDING",
+    }),
     listMerchantPayoutStatements: async () => [
       {
         statementId: "stmt-1",

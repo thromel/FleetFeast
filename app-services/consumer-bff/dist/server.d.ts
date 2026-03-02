@@ -5,6 +5,23 @@ export interface ConsumerOrderView {
     status: string;
     timelineVersion: number;
 }
+export interface ConsumerQuickOrderModifierInput {
+    name: string;
+    priceCents: number;
+}
+export interface ConsumerQuickOrderItemInput {
+    itemId: string;
+    name: string;
+    quantity: number;
+    unitPriceCents: number;
+    modifiers: ConsumerQuickOrderModifierInput[];
+}
+export interface ConsumerQuickCreateOrderInput {
+    consumerId: string;
+    merchantId: string;
+    currency: string;
+    item: ConsumerQuickOrderItemInput;
+}
 export interface ConsumerFeatureFlagContext {
     userId: string;
     role: string;
@@ -17,6 +34,7 @@ export interface ConsumerFeatureFlagSnapshot {
 }
 export interface ConsumerBffDependencies {
     getOrderById(orderId: string): Promise<ConsumerOrderView>;
+    quickCreateOrder(input: ConsumerQuickCreateOrderInput): Promise<ConsumerOrderView>;
     getFeatureFlagSnapshot(context: ConsumerFeatureFlagContext): Promise<ConsumerFeatureFlagSnapshot>;
     oidcVerifier: OidcVerifier;
     sessionAuth: AppSessionAuthService;
@@ -25,6 +43,6 @@ export interface ConsumerCoreApiDependencyOptions {
     coreApiBaseUrl: string;
     fetchImpl?: typeof fetch;
 }
-export declare function createConsumerCoreApiDependencies(options: ConsumerCoreApiDependencyOptions): Pick<ConsumerBffDependencies, "getOrderById" | "getFeatureFlagSnapshot">;
+export declare function createConsumerCoreApiDependencies(options: ConsumerCoreApiDependencyOptions): Pick<ConsumerBffDependencies, "getOrderById" | "quickCreateOrder" | "getFeatureFlagSnapshot">;
 export declare function createConsumerBffServer(dependencies: ConsumerBffDependencies): FastifyInstance;
 export declare function createConsumerBffServerFromEnv(): FastifyInstance;

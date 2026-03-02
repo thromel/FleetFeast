@@ -6,6 +6,14 @@ import { createOpsBffServer, createOpsCoreApiDependencies, } from "./server.js";
 function createTestOpsDependencies() {
     return {
         listMerchantOrders: async () => [{ id: "order-1", status: "MERCHANT_ACCEPTED" }],
+        acceptMerchantOrder: async (orderId) => ({
+            id: orderId,
+            status: "MERCHANT_ACCEPTED",
+        }),
+        requestDispatchAssignment: async (orderId) => ({
+            id: orderId,
+            status: "DISPATCH_PENDING",
+        }),
         listMerchantPayoutStatements: async () => [
             {
                 statementId: "stmt-1",

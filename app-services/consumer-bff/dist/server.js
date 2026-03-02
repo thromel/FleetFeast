@@ -18,6 +18,82 @@ export function createConsumerCoreApiDependencies(options) {
                 timelineVersion: typeof payload.timelineVersion === "number" ? payload.timelineVersion : 0,
             };
         },
+        async quickCreateOrder(input) {
+            const createBasket = await fetchImpl(`${baseUrl}/api/v1/consumer/baskets`, {
+                method: "POST",
+                headers: {
+                    "content-type": "application/json",
+                },
+                body: JSON.stringify({
+                    consumerId: input.consumerId,
+                    merchantId: input.merchantId,
+                    currency: input.currency,
+                }),
+            });
+            if (!createBasket.ok) {
+                throw new Error("CORE_API_CONSUMER_BASKET_CREATE_FAILED");
+            }
+            const basketPayload = (await createBasket.json());
+            const updateBasket = await fetchImpl(`${baseUrl}/api/v1/consumer/baskets/${encodeURIComponent(basketPayload.id)}`, {
+                method: "PATCH",
+                headers: {
+                    "content-type": "application/json",
+                },
+                body: JSON.stringify({
+                    items: [input.item],
+                }),
+            });
+            if (!updateBasket.ok) {
+                throw new Error("CORE_API_CONSUMER_BASKET_UPDATE_FAILED");
+            }
+            const createQuote = await fetchImpl(`${baseUrl}/api/v1/consumer/quotes`, {
+                method: "POST",
+                headers: {
+                    "content-type": "application/json",
+                },
+                body: JSON.stringify({
+                    basketId: basketPayload.id,
+                }),
+            });
+            if (!createQuote.ok) {
+                throw new Error("CORE_API_CONSUMER_QUOTE_CREATE_FAILED");
+            }
+            const quotePayload = (await createQuote.json());
+            const createCheckout = await fetchImpl(`${baseUrl}/api/v1/consumer/checkout`, {
+                method: "POST",
+                headers: {
+                    "content-type": "application/json",
+                },
+                body: JSON.stringify({
+                    basketId: quotePayload.basketId,
+                    quoteId: quotePayload.quoteId,
+                    quoteHash: quotePayload.quoteHash,
+                }),
+            });
+            if (!createCheckout.ok) {
+                throw new Error("CORE_API_CONSUMER_CHECKOUT_CREATE_FAILED");
+            }
+            const checkoutPayload = (await createCheckout.json());
+            const createOrder = await fetchImpl(`${baseUrl}/api/v1/consumer/orders`, {
+                method: "POST",
+                headers: {
+                    "content-type": "application/json",
+                },
+                body: JSON.stringify({
+                    checkoutId: checkoutPayload.checkoutId,
+                    quoteHash: checkoutPayload.quoteHash,
+                }),
+            });
+            if (!createOrder.ok) {
+                throw new Error("CORE_API_CONSUMER_ORDER_CREATE_FAILED");
+            }
+            const orderPayload = (await createOrder.json());
+            return {
+                id: orderPayload.id,
+                status: orderPayload.status,
+                timelineVersion: typeof orderPayload.timelineVersion === "number" ? orderPayload.timelineVersion : 0,
+            };
+        },
         async getFeatureFlagSnapshot() {
             return {
                 flags: configuredFlags,
@@ -128,6 +204,74 @@ export function createConsumerBffServer(dependencies) {
             };
         }
         const order = await dependencies.getOrderById(params.orderId);
+        return { order };
+    });
+    app.post("/app/v1/consumer/orders/quick-create", async (request, reply) => {
+        const payload = request.body;
+        if (typeof payload?.consumerId !== "string" ||
+            payload.consumerId.trim().length === 0 ||
+            typeof payload?.merchantId !== "string" ||
+            payload.merchantId.trim().length === 0 ||
+            typeof payload?.currency !== "string" ||
+            payload.currency.trim().length === 0 ||
+            typeof payload?.item !== "object" ||
+            payload.item === null) {
+            reply.status(400);
+            return {
+                errorCode: "INVALID_CONSUMER_QUICK_CREATE_PAYLOAD",
+                message: "consumerId, merchantId, currency, and item are required",
+            };
+        }
+        const item = payload.item;
+        if (typeof item.itemId !== "string" ||
+            item.itemId.trim().length === 0 ||
+            typeof item.name !== "string" ||
+            item.name.trim().length === 0 ||
+            typeof item.quantity !== "number" ||
+            !Number.isInteger(item.quantity) ||
+            item.quantity <= 0 ||
+            typeof item.unitPriceCents !== "number" ||
+            !Number.isInteger(item.unitPriceCents) ||
+            item.unitPriceCents < 0 ||
+            !Array.isArray(item.modifiers)) {
+            reply.status(400);
+            return {
+                errorCode: "INVALID_CONSUMER_QUICK_CREATE_ITEM",
+                message: "item payload is invalid",
+            };
+        }
+        const modifiers = [];
+        for (const modifier of item.modifiers) {
+            if (typeof modifier !== "object" ||
+                modifier === null ||
+                typeof modifier.name !== "string" ||
+                modifier.name.trim().length === 0 ||
+                typeof modifier.priceCents !== "number" ||
+                !Number.isInteger(modifier.priceCents)) {
+                reply.status(400);
+                return {
+                    errorCode: "INVALID_CONSUMER_QUICK_CREATE_ITEM",
+                    message: "item modifiers payload is invalid",
+                };
+            }
+            modifiers.push({
+                name: modifier.name,
+                priceCents: modifier.priceCents,
+            });
+        }
+        const order = await dependencies.quickCreateOrder({
+            consumerId: payload.consumerId,
+            merchantId: payload.merchantId,
+            currency: payload.currency,
+            item: {
+                itemId: item.itemId,
+                name: item.name,
+                quantity: item.quantity,
+                unitPriceCents: item.unitPriceCents,
+                modifiers,
+            },
+        });
+        reply.status(201);
         return { order };
     });
     app.get("/app/v1/consumer/feature-flags", async (request, reply) => {

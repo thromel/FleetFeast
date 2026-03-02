@@ -13,6 +13,7 @@ export interface CourierJobView {
   jobId: string;
   orderId: string;
   status: string;
+  courierId?: string | null;
 }
 
 export interface CourierFeatureFlagContext {
@@ -29,6 +30,9 @@ export interface CourierFeatureFlagSnapshot {
 
 export interface CourierBffDependencies {
   listAvailableJobs(): Promise<CourierJobView[]>;
+  acceptJob(jobId: string, courierId: string): Promise<CourierJobView>;
+  pickupJob(jobId: string, courierId: string): Promise<CourierJobView>;
+  dropoffJob(jobId: string, courierId: string): Promise<CourierJobView>;
   getFeatureFlagSnapshot(context: CourierFeatureFlagContext): Promise<CourierFeatureFlagSnapshot>;
   oidcVerifier: OidcVerifier;
   sessionAuth: AppSessionAuthService;
@@ -41,7 +45,10 @@ export interface CourierCoreApiDependencyOptions {
 
 export function createCourierCoreApiDependencies(
   options: CourierCoreApiDependencyOptions,
-): Pick<CourierBffDependencies, "listAvailableJobs" | "getFeatureFlagSnapshot"> {
+): Pick<
+  CourierBffDependencies,
+  "listAvailableJobs" | "acceptJob" | "pickupJob" | "dropoffJob" | "getFeatureFlagSnapshot"
+> {
   const baseUrl = options.coreApiBaseUrl.replace(/\/+$/, "");
   const fetchImpl = options.fetchImpl ?? fetch;
   const configuredFlags = parseCourierFeatureFlags(process.env.COURIER_FEATURE_FLAGS_JSON);
@@ -63,6 +70,57 @@ export function createCourierCoreApiDependencies(
         orderId: job.orderId,
         status: job.status,
       }));
+    },
+    async acceptJob(jobId: string, courierId: string): Promise<CourierJobView> {
+      const response = await fetchImpl(
+        `${baseUrl}/api/v1/courier/jobs/${encodeURIComponent(jobId)}/accept`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ courierId }),
+        },
+      );
+      if (!response.ok) {
+        throw new Error("CORE_API_COURIER_ACCEPT_JOB_FAILED");
+      }
+
+      return (await response.json()) as CourierJobView;
+    },
+    async pickupJob(jobId: string, courierId: string): Promise<CourierJobView> {
+      const response = await fetchImpl(
+        `${baseUrl}/api/v1/courier/jobs/${encodeURIComponent(jobId)}/pickup`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ courierId }),
+        },
+      );
+      if (!response.ok) {
+        throw new Error("CORE_API_COURIER_PICKUP_JOB_FAILED");
+      }
+
+      return (await response.json()) as CourierJobView;
+    },
+    async dropoffJob(jobId: string, courierId: string): Promise<CourierJobView> {
+      const response = await fetchImpl(
+        `${baseUrl}/api/v1/courier/jobs/${encodeURIComponent(jobId)}/dropoff`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ courierId }),
+        },
+      );
+      if (!response.ok) {
+        throw new Error("CORE_API_COURIER_DROPOFF_JOB_FAILED");
+      }
+
+      return (await response.json()) as CourierJobView;
     },
     async getFeatureFlagSnapshot(): Promise<CourierFeatureFlagSnapshot> {
       return {
@@ -193,6 +251,66 @@ export function createCourierBffServer(
   app.get("/app/v1/courier/jobs/available", async () => {
     const jobs = await dependencies.listAvailableJobs();
     return { jobs };
+  });
+
+  app.post("/app/v1/courier/jobs/:jobId/accept", async (request, reply) => {
+    const params = request.params as { jobId?: unknown };
+    const payload = request.body as { courierId?: unknown };
+    if (
+      typeof params?.jobId !== "string" ||
+      params.jobId.trim().length === 0 ||
+      typeof payload?.courierId !== "string" ||
+      payload.courierId.trim().length === 0
+    ) {
+      reply.status(400);
+      return {
+        errorCode: "INVALID_COURIER_JOB_ACTION_PAYLOAD",
+        message: "jobId route param and courierId body field are required",
+      };
+    }
+
+    const job = await dependencies.acceptJob(params.jobId, payload.courierId);
+    return { job };
+  });
+
+  app.post("/app/v1/courier/jobs/:jobId/pickup", async (request, reply) => {
+    const params = request.params as { jobId?: unknown };
+    const payload = request.body as { courierId?: unknown };
+    if (
+      typeof params?.jobId !== "string" ||
+      params.jobId.trim().length === 0 ||
+      typeof payload?.courierId !== "string" ||
+      payload.courierId.trim().length === 0
+    ) {
+      reply.status(400);
+      return {
+        errorCode: "INVALID_COURIER_JOB_ACTION_PAYLOAD",
+        message: "jobId route param and courierId body field are required",
+      };
+    }
+
+    const job = await dependencies.pickupJob(params.jobId, payload.courierId);
+    return { job };
+  });
+
+  app.post("/app/v1/courier/jobs/:jobId/dropoff", async (request, reply) => {
+    const params = request.params as { jobId?: unknown };
+    const payload = request.body as { courierId?: unknown };
+    if (
+      typeof params?.jobId !== "string" ||
+      params.jobId.trim().length === 0 ||
+      typeof payload?.courierId !== "string" ||
+      payload.courierId.trim().length === 0
+    ) {
+      reply.status(400);
+      return {
+        errorCode: "INVALID_COURIER_JOB_ACTION_PAYLOAD",
+        message: "jobId route param and courierId body field are required",
+      };
+    }
+
+    const job = await dependencies.dropoffJob(params.jobId, payload.courierId);
+    return { job };
   });
 
   app.get("/app/v1/courier/feature-flags", async (request, reply) => {
