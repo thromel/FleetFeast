@@ -114,7 +114,19 @@ export function createConsumerCoreApiDependencies(
             "content-type": "application/json",
           },
           body: JSON.stringify({
-            items: [input.item],
+            items: [
+              {
+                itemId: input.item.itemId,
+                name: input.item.name,
+                quantity: input.item.quantity,
+                unitPriceCents:
+                  input.item.unitPriceCents +
+                  input.item.modifiers.reduce((sum, modifier) => sum + modifier.priceCents, 0),
+                modifiers: input.item.modifiers
+                  .map((modifier) => modifier.name.trim())
+                  .filter((name) => name.length > 0),
+              },
+            ],
           }),
         },
       );

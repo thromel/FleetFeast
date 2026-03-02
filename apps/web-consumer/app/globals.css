@@ -1,0 +1,83 @@
+:root {
+  color-scheme: light;
+  font-family: "Söhne", "Avenir Next", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(145deg, #fffdf6 0%, #f6fbff 60%, #eef8f2 100%);
+  color: #1b2430;
+}
+
+.shell {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 2.25rem 1.25rem 3rem;
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid #d4e2f0;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  backdrop-filter: blur(4px);
+}
+
+.headline {
+  margin: 0 0 0.5rem;
+}
+
+.meta {
+  margin: 0 0 1rem;
+  color: #4a5a6a;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field input {
+  border: 1px solid #c9d8e7;
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.65rem;
+  font: inherit;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.8rem;
+}
+
+.button {
+  border: 1px solid #0d5fda;
+  color: #ffffff;
+  background: #0d5fda;
+  border-radius: 0.65rem;
+  padding: 0.6rem 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid #bfd4ec;
+  background: #edf6ff;
+  color: #0a4ca6;
+  padding: 0.22rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}

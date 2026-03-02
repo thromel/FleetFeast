@@ -167,7 +167,12 @@ test("consumer core-api dependencies quick-create flow calls basket quote checko
         name: "Burger",
         quantity: 1,
         unitPriceCents: 1299,
-        modifiers: [],
+        modifiers: [
+          {
+            name: "extra-cheese",
+            priceCents: 100,
+          },
+        ],
       },
     });
 
@@ -183,6 +188,11 @@ test("consumer core-api dependencies quick-create flow calls basket quote checko
         "POST /api/v1/consumer/orders",
       ],
     );
+    const patchBody = JSON.parse(requests[1]?.body ?? "{}") as {
+      items?: Array<{ unitPriceCents?: number; modifiers?: unknown }>;
+    };
+    assert.equal(patchBody.items?.[0]?.unitPriceCents, 1399);
+    assert.deepEqual(patchBody.items?.[0]?.modifiers, ["extra-cheese"]);
   } finally {
     await new Promise<void>((resolve, reject) => {
       backend.close((error?: Error) => {
