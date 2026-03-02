@@ -24,7 +24,8 @@ function startProcess(name, command, args, env = {}) {
 
 const processes = [
   startProcess("core-api", "npm", ["--prefix", "core-api", "run", "dev"], {
-    PORT: "3000"
+    PORT: "3000",
+    REALTIME_GATEWAY_BASE_URL: "http://127.0.0.1:4104"
   }),
   startProcess("consumer-bff", "npm", ["--workspace", "@fleetfeast/consumer-bff", "run", "start"], {
     CORE_API_BASE_URL: "http://127.0.0.1:3000",
