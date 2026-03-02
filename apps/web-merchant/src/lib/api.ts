@@ -41,6 +41,20 @@ export interface MerchantApiOptions {
   fetchImpl?: typeof fetch;
 }
 
+export interface DispatchAssignmentCandidateInput {
+  courierId: string;
+  distanceMeters: number;
+  available: boolean;
+  activeOrders: number;
+  withinRestWindow: boolean;
+}
+
+export interface RequestDispatchAssignmentInput {
+  candidates: DispatchAssignmentCandidateInput[];
+  slaPressure: number;
+  merchantSelfDeliveryEnabled: boolean;
+}
+
 export interface MerchantAppSession {
   sessionId: string;
   userId: string;
@@ -116,6 +130,71 @@ export async function fetchMerchantOrders(
     id: order.id,
     status: order.status,
   }));
+}
+
+export async function acceptMerchantOrder(
+  orderId: string,
+  options?: MerchantApiOptions,
+): Promise<MerchantOrderView> {
+  const fetchImpl = options?.fetchImpl ?? fetch;
+  const baseUrl = resolveOpsBffBaseUrl(options);
+  const headers = options?.appSessionToken
+    ? { authorization: `Bearer ${options.appSessionToken}` }
+    : undefined;
+  const response = await fetchImpl(
+    `${baseUrl}/app/v1/merchant/orders/${encodeURIComponent(orderId)}/accept`,
+    {
+      method: "POST",
+      headers,
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("OPS_BFF_MERCHANT_ACCEPT_ORDER_FAILED");
+  }
+
+  const payload = (await response.json()) as { order?: MerchantOrderView };
+  if (!payload.order) {
+    throw new Error("OPS_BFF_MERCHANT_ACCEPT_ORDER_INVALID_PAYLOAD");
+  }
+
+  return payload.order;
+}
+
+export async function requestMerchantDispatch(
+  orderId: string,
+  dispatchRequest: RequestDispatchAssignmentInput,
+  options?: MerchantApiOptions,
+): Promise<MerchantOrderView> {
+  const fetchImpl = options?.fetchImpl ?? fetch;
+  const baseUrl = resolveOpsBffBaseUrl(options);
+  const headers = {
+    "content-type": "application/json",
+    ...(options?.appSessionToken
+      ? { authorization: `Bearer ${options.appSessionToken}` }
+      : {}),
+  };
+  const response = await fetchImpl(
+    `${baseUrl}/app/v1/merchant/orders/${encodeURIComponent(orderId)}/request-dispatch`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(dispatchRequest),
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("OPS_BFF_MERCHANT_REQUEST_DISPATCH_FAILED");
+  }
+
+  const payload = (await response.json()) as { order?: MerchantOrderView };
+  if (!payload.order) {
+    throw new Error("OPS_BFF_MERCHANT_REQUEST_DISPATCH_INVALID_PAYLOAD");
+  }
+
+  return payload.order;
 }
 
 export async function fetchMerchantFeatureFlags(

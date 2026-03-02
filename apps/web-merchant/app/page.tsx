@@ -4,8 +4,19 @@ import {
   fetchMerchantOrders,
   fetchMerchantPayoutStatements,
 } from "../src/lib/api";
+import { MerchantRealtimeFeed } from "../src/lib/realtime-feed";
 
-export default async function MerchantPage() {
+interface MerchantPageProps {
+  searchParams?: {
+    merchantId?: string;
+    action?: string;
+    status?: string;
+    orderId?: string;
+    error?: string;
+  };
+}
+
+export default async function MerchantPage({ searchParams }: MerchantPageProps) {
   const merchantId = process.env.MERCHANT_ID ?? "merchant-1";
   const sessionExchange = process.env.WEB_MERCHANT_OIDC_TOKEN
     ? await createMerchantAuthSessionManager().signIn({
@@ -37,12 +48,21 @@ export default async function MerchantPage() {
           { appSessionToken },
         )
       : null;
+  const realtimeOrderId = searchParams?.orderId ?? orders[0]?.id ?? null;
 
   return (
     <main className="shell">
       <section className="card">
         <h1 className="headline">Merchant Dispatch Desk</h1>
         <p className="meta">Live feed from ops-bff for merchant: {merchantId}</p>
+        {searchParams?.action && searchParams?.orderId ? (
+          <p className="meta">
+            Last action: <strong>{searchParams.action}</strong> on{" "}
+            <strong>{searchParams.orderId}</strong>{" "}
+            {searchParams.status ? <span className="chip">{searchParams.status}</span> : null}
+          </p>
+        ) : null}
+        {searchParams?.error ? <p className="meta">Last action failed: {searchParams.error}</p> : null}
         {!hasAppSession ? (
           <p className="meta">
             App session required. Set `WEB_MERCHANT_APP_SESSION_TOKEN` or `WEB_MERCHANT_OIDC_TOKEN`.
@@ -53,9 +73,33 @@ export default async function MerchantPage() {
             <li key={order.id} className="item">
               <span>{order.id}</span>
               <span className="chip">{order.status}</span>
+              {hasAppSession ? (
+                <span className="inline-actions">
+                  <form method="post" action={`/orders/${encodeURIComponent(order.id)}/accept`}>
+                    <input type="hidden" name="merchantId" value={merchantId} />
+                    <input type="hidden" name="appSessionToken" value={appSessionToken} />
+                    <button className="button" type="submit">
+                      Accept
+                    </button>
+                  </form>
+                  <form method="post" action={`/orders/${encodeURIComponent(order.id)}/request-dispatch`}>
+                    <input type="hidden" name="merchantId" value={merchantId} />
+                    <input type="hidden" name="appSessionToken" value={appSessionToken} />
+                    <button className="button" type="submit">
+                      Request Dispatch
+                    </button>
+                  </form>
+                </span>
+              ) : null}
             </li>
           ))}
         </ul>
+        {realtimeOrderId ? (
+          <>
+            <h2 className="headline">Realtime Order Events</h2>
+            <MerchantRealtimeFeed orderId={realtimeOrderId} />
+          </>
+        ) : null}
         <h2 className="headline">Recent Payout Statements</h2>
         <ul className="list">
           {payoutStatements.map((statement) => (
