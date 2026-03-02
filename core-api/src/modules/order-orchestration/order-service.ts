@@ -372,6 +372,7 @@ export class OrderService {
 
   private async publishEvent(event: DomainEvent): Promise<void> {
     this.eventBus.publish(event);
+    await this.eventBus.flush();
     if (this.timelineService) {
       await this.timelineService.projectEvent(event);
     }

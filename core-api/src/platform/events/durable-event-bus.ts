@@ -32,6 +32,7 @@ export class DurableEventBus extends InMemoryEventBus {
   async flush(): Promise<void> {
     await this.hydrationTask;
     await Promise.all([...this.pendingPublishes]);
+    await super.flush();
   }
 
   private async hydrateFromOutbox(): Promise<void> {

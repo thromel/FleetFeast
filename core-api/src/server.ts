@@ -7,6 +7,11 @@ import {
 import type { EventBroker } from "./platform/broker/event-broker.js";
 import { RedisEventBroker } from "./platform/broker/redis-event-broker.js";
 import { DurableEventBus } from "./platform/events/durable-event-bus.js";
+import {
+  createRealtimeEventRelaySubscriber,
+  HttpRealtimeEventPublisher,
+  type RealtimeEventPublisher,
+} from "./platform/realtime/realtime-event-relay.js";
 import type { DocumentStore } from "./platform/persistence/document-store.js";
 import { PostgresDocumentStore } from "./platform/persistence/postgres-document-store.js";
 import { PersistentSessionStore } from "./platform/persistence/repositories/persistent-session-store.js";
@@ -217,6 +222,7 @@ export interface CreateServerOptions {
   documentStore?: DocumentStore;
   eventBroker?: EventBroker;
   dispatchAssignmentClient?: DispatchAssignmentClient;
+  realtimeEventPublisher?: RealtimeEventPublisher;
 }
 
 function resolveDocumentStore(options: CreateServerOptions): DocumentStore | undefined {
@@ -262,6 +268,24 @@ function resolveDispatchAssignmentClient(
   }
 
   return new GrpcDispatchAssignmentClient(target);
+}
+
+function resolveRealtimeEventPublisher(
+  options: CreateServerOptions,
+): RealtimeEventPublisher | undefined {
+  if (options.realtimeEventPublisher) {
+    return options.realtimeEventPublisher;
+  }
+
+  const baseUrl = process.env.REALTIME_GATEWAY_BASE_URL;
+  if (!baseUrl || baseUrl.trim().length === 0) {
+    return undefined;
+  }
+
+  return new HttpRealtimeEventPublisher({
+    baseUrl,
+    publishApiKey: process.env.REALTIME_PUBLISH_API_KEY,
+  });
 }
 
 function sendJson(
@@ -2000,9 +2024,13 @@ export function createServer(options: CreateServerOptions = {}) {
 
   const eventBroker = resolveEventBroker(options);
   const dispatchAssignmentClient = resolveDispatchAssignmentClient(options);
+  const realtimeEventPublisher = resolveRealtimeEventPublisher(options);
   const eventBus = persistenceEnabled
     ? new DurableEventBus(documentStore, eventBroker)
     : new InMemoryEventBus();
+  if (realtimeEventPublisher) {
+    eventBus.subscribe(createRealtimeEventRelaySubscriber(realtimeEventPublisher));
+  }
   const repository = persistenceEnabled
     ? new PersistentIdentityRepository(documentStore!)
     : new InMemoryIdentityRepository();
