@@ -10,7 +10,7 @@ import {
   fetchAdminIncidents,
   fetchAdminSloDashboard,
   refreshAdminSession,
-} from "./api.js";
+} from "./api";
 
 test("fetchAdminIncidents calls ops-bff admin incidents endpoint", async () => {
   const requests: Array<{ method: string; url: string; authorization?: string }> = [];

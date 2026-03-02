@@ -4,7 +4,7 @@ import {
   type AdminApiOptions,
   type AdminSessionExchangeRequest,
   type AdminSessionExchangeResponse,
-} from "./api.js";
+} from "./api";
 
 export interface AdminSessionRefreshInput {
   traceId: string;

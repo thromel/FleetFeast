@@ -9,7 +9,7 @@ import {
   fetchMerchantOrders,
   fetchMerchantPayoutStatements,
   refreshMerchantSession,
-} from "./api.js";
+} from "./api";
 
 test("fetchMerchantOrders calls ops-bff merchant endpoint", async () => {
   const requests: Array<{ method: string; url: string; authorization?: string }> = [];

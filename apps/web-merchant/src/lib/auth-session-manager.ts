@@ -4,7 +4,7 @@ import {
   type MerchantApiOptions,
   type MerchantSessionExchangeRequest,
   type MerchantSessionExchangeResponse,
-} from "./api.js";
+} from "./api";
 
 export interface MerchantSessionRefreshInput {
   traceId: string;
