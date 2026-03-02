@@ -45,6 +45,38 @@ struct ConsumerBackendClientTests {
     }
 
     @Test
+    func createQuickOrderPostsToQuickCreatePath() async throws {
+        let recorder = RecordingHTTPClient(
+            responsesByPath: [
+                "/app/v1/consumer/orders/quick-create": ("{\"order\":{\"id\":\"order-quick-1\",\"status\":\"CREATED\",\"timelineVersion\":0}}", 201)
+            ]
+        )
+        let client = ConsumerBackendClient(
+            baseURL: URL(string: "http://127.0.0.1:4101")!,
+            httpClient: recorder
+        )
+
+        let order = try await client.createQuickOrder(
+            consumerId: "consumer-1",
+            merchantId: "merchant-1",
+            currency: "USD",
+            item: ConsumerQuickOrderItem(
+                itemId: "item-1",
+                name: "Burger",
+                quantity: 1,
+                unitPriceCents: 1299,
+                modifiers: []
+            )
+        )
+
+        #expect(order.id == "order-quick-1")
+        #expect(order.status == "CREATED")
+        #expect(recorder.lastPath == "/app/v1/consumer/orders/quick-create")
+        #expect(recorder.lastMethod == "POST")
+        #expect(recorder.lastBody?.contains("\"consumerId\":\"consumer-1\"") == true)
+    }
+
+    @Test
     func exchangeSessionPostsToSessionExchangePath() async throws {
         let recorder = RecordingHTTPClient(
             responsesByPath: [

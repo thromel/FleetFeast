@@ -25,6 +25,7 @@ public struct CourierJob: Decodable {
     public let jobId: String
     public let orderId: String
     public let status: String
+    public let courierId: String?
 }
 
 public struct FeatureFlagSnapshot: Decodable {
@@ -67,6 +68,14 @@ private struct CourierJobsEnvelope: Decodable {
     let jobs: [CourierJob]
 }
 
+private struct CourierJobEnvelope: Decodable {
+    let job: CourierJob
+}
+
+private struct CourierJobActionRequest: Encodable {
+    let courierId: String
+}
+
 private struct CourierSessionExchangeRequest: Encodable {
     let oidcToken: String
     let traceId: String
@@ -93,6 +102,30 @@ public struct CourierBackendClient {
     public func fetchAvailableJobs() async throws -> [CourierJob] {
         let data = try await performGET(path: "/app/v1/courier/jobs/available")
         return try decoder.decode(CourierJobsEnvelope.self, from: data).jobs
+    }
+
+    public func acceptJob(jobId: String, courierId: String) async throws -> CourierJob {
+        let data = try await performPOST(
+            path: "/app/v1/courier/jobs/\(jobId)/accept",
+            body: try encoder.encode(CourierJobActionRequest(courierId: courierId))
+        )
+        return try decoder.decode(CourierJobEnvelope.self, from: data).job
+    }
+
+    public func pickupJob(jobId: String, courierId: String) async throws -> CourierJob {
+        let data = try await performPOST(
+            path: "/app/v1/courier/jobs/\(jobId)/pickup",
+            body: try encoder.encode(CourierJobActionRequest(courierId: courierId))
+        )
+        return try decoder.decode(CourierJobEnvelope.self, from: data).job
+    }
+
+    public func dropoffJob(jobId: String, courierId: String) async throws -> CourierJob {
+        let data = try await performPOST(
+            path: "/app/v1/courier/jobs/\(jobId)/dropoff",
+            body: try encoder.encode(CourierJobActionRequest(courierId: courierId))
+        )
+        return try decoder.decode(CourierJobEnvelope.self, from: data).job
     }
 
     public func fetchFeatureFlags(

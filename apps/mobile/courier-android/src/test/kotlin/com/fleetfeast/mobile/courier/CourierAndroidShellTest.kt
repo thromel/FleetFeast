@@ -79,6 +79,42 @@ class CourierAndroidShellTest {
   }
 
   @Test
+  fun backend_client_executes_job_actions() {
+    val transport = RecordingTransport(
+      responsesByPath = mapOf(
+        "/app/v1/courier/jobs/job-1/accept" to HttpTransportResponse(
+          statusCode = 200,
+          body = "{\"job\":{\"jobId\":\"job-1\",\"orderId\":\"job-1\",\"status\":\"ACCEPTED\",\"courierId\":\"courier-1\"}}",
+        ),
+        "/app/v1/courier/jobs/job-1/pickup" to HttpTransportResponse(
+          statusCode = 200,
+          body = "{\"job\":{\"jobId\":\"job-1\",\"orderId\":\"job-1\",\"status\":\"PICKED_UP\",\"courierId\":\"courier-1\"}}",
+        ),
+        "/app/v1/courier/jobs/job-1/dropoff" to HttpTransportResponse(
+          statusCode = 200,
+          body = "{\"job\":{\"jobId\":\"job-1\",\"orderId\":\"job-1\",\"status\":\"DROPPED_OFF\",\"courierId\":\"courier-1\"}}",
+        ),
+      ),
+    )
+    val client = CourierBackendClient(
+      baseUrl = "http://127.0.0.1:4102",
+      transport = transport,
+    )
+
+    val accepted = client.acceptJob("job-1", "courier-1")
+    val pickedUp = client.pickupJob("job-1", "courier-1")
+    val droppedOff = client.dropoffJob("job-1", "courier-1")
+
+    assertEquals("ACCEPTED", accepted.status)
+    assertEquals("PICKED_UP", pickedUp.status)
+    assertEquals("DROPPED_OFF", droppedOff.status)
+    assertEquals("/app/v1/courier/jobs/job-1/accept", transport.paths[0])
+    assertEquals("/app/v1/courier/jobs/job-1/pickup", transport.paths[1])
+    assertEquals("/app/v1/courier/jobs/job-1/dropoff", transport.paths[2])
+    assertTrue(transport.bodies[0].contains("\"courierId\":\"courier-1\""))
+  }
+
+  @Test
   fun backend_client_exchanges_session_with_post_request() {
     val transport = RecordingTransport(
       responsesByPath = mapOf(

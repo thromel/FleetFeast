@@ -68,6 +68,42 @@ class ConsumerAndroidShellTest {
   }
 
   @Test
+  fun backend_client_creates_quick_order() {
+    val transport = RecordingTransport(
+      responsesByPath = mapOf(
+        "/app/v1/consumer/orders/quick-create" to HttpTransportResponse(
+          statusCode = 201,
+          body = "{\"order\":{\"id\":\"order-quick-1\",\"status\":\"CREATED\",\"timelineVersion\":0}}",
+        ),
+      ),
+    )
+    val client = ConsumerBackendClient(
+      baseUrl = "http://127.0.0.1:4101",
+      transport = transport,
+    )
+
+    val order = client.createQuickOrder(
+      consumerId = "consumer-1",
+      merchantId = "merchant-1",
+      currency = "USD",
+      item = ConsumerQuickOrderItem(
+        itemId = "item-1",
+        name = "Burger",
+        quantity = 1,
+        unitPriceCents = 1299,
+        modifiers = emptyList(),
+      ),
+    )
+
+    assertEquals("order-quick-1", order.id)
+    assertEquals("CREATED", order.status)
+    assertEquals("/app/v1/consumer/orders/quick-create", transport.paths[0])
+    assertEquals("POST", transport.methods[0])
+    assertTrue(transport.bodies[0].contains("\"consumerId\":\"consumer-1\""))
+    assertTrue(transport.bodies[0].contains("\"merchantId\":\"merchant-1\""))
+  }
+
+  @Test
   fun backend_client_exchanges_session_with_post_request() {
     val transport = RecordingTransport(
       responsesByPath = mapOf(

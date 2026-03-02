@@ -27,6 +27,38 @@ public struct ConsumerOrder: Decodable {
     public let timelineVersion: Int
 }
 
+public struct ConsumerQuickOrderModifier: Codable {
+    public let name: String
+    public let priceCents: Int
+
+    public init(name: String, priceCents: Int) {
+        self.name = name
+        self.priceCents = priceCents
+    }
+}
+
+public struct ConsumerQuickOrderItem: Codable {
+    public let itemId: String
+    public let name: String
+    public let quantity: Int
+    public let unitPriceCents: Int
+    public let modifiers: [ConsumerQuickOrderModifier]
+
+    public init(
+        itemId: String,
+        name: String,
+        quantity: Int,
+        unitPriceCents: Int,
+        modifiers: [ConsumerQuickOrderModifier]
+    ) {
+        self.itemId = itemId
+        self.name = name
+        self.quantity = quantity
+        self.unitPriceCents = unitPriceCents
+        self.modifiers = modifiers
+    }
+}
+
 public struct FeatureFlagSnapshot: Decodable {
     public let flags: [String: Bool]
     public let ttlSeconds: Int
@@ -67,6 +99,13 @@ private struct ConsumerOrderEnvelope: Decodable {
     let order: ConsumerOrder
 }
 
+private struct ConsumerQuickCreateOrderRequest: Encodable {
+    let consumerId: String
+    let merchantId: String
+    let currency: String
+    let item: ConsumerQuickOrderItem
+}
+
 private struct ConsumerSessionExchangeRequest: Encodable {
     let oidcToken: String
     let traceId: String
@@ -92,6 +131,25 @@ public struct ConsumerBackendClient {
 
     public func fetchOrder(orderId: String) async throws -> ConsumerOrder {
         let data = try await performGET(path: "/app/v1/consumer/orders/\(orderId)")
+        return try decoder.decode(ConsumerOrderEnvelope.self, from: data).order
+    }
+
+    public func createQuickOrder(
+        consumerId: String,
+        merchantId: String,
+        currency: String,
+        item: ConsumerQuickOrderItem
+    ) async throws -> ConsumerOrder {
+        let requestBody = ConsumerQuickCreateOrderRequest(
+            consumerId: consumerId,
+            merchantId: merchantId,
+            currency: currency,
+            item: item
+        )
+        let data = try await performPOST(
+            path: "/app/v1/consumer/orders/quick-create",
+            body: try encoder.encode(requestBody)
+        )
         return try decoder.decode(ConsumerOrderEnvelope.self, from: data).order
     }
 

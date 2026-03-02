@@ -61,6 +61,21 @@ data class ConsumerOrder(
 )
 
 @Serializable
+data class ConsumerQuickOrderModifier(
+  val name: String,
+  val priceCents: Int,
+)
+
+@Serializable
+data class ConsumerQuickOrderItem(
+  val itemId: String,
+  val name: String,
+  val quantity: Int,
+  val unitPriceCents: Int,
+  val modifiers: List<ConsumerQuickOrderModifier>,
+)
+
+@Serializable
 data class FeatureFlagSnapshot(
   val flags: Map<String, Boolean>,
   val ttlSeconds: Int,
@@ -101,6 +116,14 @@ private data class ConsumerOrderPayload(
 )
 
 @Serializable
+private data class ConsumerQuickCreateOrderRequest(
+  val consumerId: String,
+  val merchantId: String,
+  val currency: String,
+  val item: ConsumerQuickOrderItem,
+)
+
+@Serializable
 private data class ConsumerSessionExchangeRequest(
   val oidcToken: String,
   val traceId: String,
@@ -131,6 +154,25 @@ class ConsumerBackendClient(
 
   fun fetchOrder(orderId: String): ConsumerOrder {
     val response = executeGet("/app/v1/consumer/orders/$orderId")
+    return json.decodeFromString<ConsumerOrderPayload>(response.body ?: "{}").order
+  }
+
+  fun createQuickOrder(
+    consumerId: String,
+    merchantId: String,
+    currency: String,
+    item: ConsumerQuickOrderItem,
+  ): ConsumerOrder {
+    val requestBody = ConsumerQuickCreateOrderRequest(
+      consumerId = consumerId,
+      merchantId = merchantId,
+      currency = currency,
+      item = item,
+    )
+    val response = executePost(
+      path = "/app/v1/consumer/orders/quick-create",
+      body = json.encodeToString(requestBody),
+    )
     return json.decodeFromString<ConsumerOrderPayload>(response.body ?: "{}").order
   }
 

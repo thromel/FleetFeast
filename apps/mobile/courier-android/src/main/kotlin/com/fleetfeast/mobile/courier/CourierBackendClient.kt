@@ -58,6 +58,7 @@ data class CourierJob(
   val jobId: String,
   val orderId: String,
   val status: String,
+  val courierId: String? = null,
 )
 
 @Serializable
@@ -101,6 +102,16 @@ private data class CourierJobsPayload(
 )
 
 @Serializable
+private data class CourierJobPayload(
+  val job: CourierJob,
+)
+
+@Serializable
+private data class CourierJobActionRequest(
+  val courierId: String,
+)
+
+@Serializable
 private data class CourierSessionExchangeRequest(
   val oidcToken: String,
   val traceId: String,
@@ -132,6 +143,30 @@ class CourierBackendClient(
   fun fetchAvailableJobs(): List<CourierJob> {
     val response = executeGet("/app/v1/courier/jobs/available")
     return json.decodeFromString<CourierJobsPayload>(response.body ?: "{}").jobs
+  }
+
+  fun acceptJob(jobId: String, courierId: String): CourierJob {
+    val response = executePost(
+      path = "/app/v1/courier/jobs/$jobId/accept",
+      body = json.encodeToString(CourierJobActionRequest(courierId = courierId)),
+    )
+    return json.decodeFromString<CourierJobPayload>(response.body ?: "{}").job
+  }
+
+  fun pickupJob(jobId: String, courierId: String): CourierJob {
+    val response = executePost(
+      path = "/app/v1/courier/jobs/$jobId/pickup",
+      body = json.encodeToString(CourierJobActionRequest(courierId = courierId)),
+    )
+    return json.decodeFromString<CourierJobPayload>(response.body ?: "{}").job
+  }
+
+  fun dropoffJob(jobId: String, courierId: String): CourierJob {
+    val response = executePost(
+      path = "/app/v1/courier/jobs/$jobId/dropoff",
+      body = json.encodeToString(CourierJobActionRequest(courierId = courierId)),
+    )
+    return json.decodeFromString<CourierJobPayload>(response.body ?: "{}").job
   }
 
   fun fetchFeatureFlags(

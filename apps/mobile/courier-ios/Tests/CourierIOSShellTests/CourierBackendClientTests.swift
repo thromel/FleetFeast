@@ -44,6 +44,34 @@ struct CourierBackendClientTests {
     }
 
     @Test
+    func jobActionsPostToCourierJobActionPaths() async throws {
+        let recorder = RecordingHTTPClient(
+            responsesByPath: [
+                "/app/v1/courier/jobs/job-1/accept": ("{\"job\":{\"jobId\":\"job-1\",\"orderId\":\"job-1\",\"status\":\"ACCEPTED\",\"courierId\":\"courier-1\"}}", 200),
+                "/app/v1/courier/jobs/job-1/pickup": ("{\"job\":{\"jobId\":\"job-1\",\"orderId\":\"job-1\",\"status\":\"PICKED_UP\",\"courierId\":\"courier-1\"}}", 200),
+                "/app/v1/courier/jobs/job-1/dropoff": ("{\"job\":{\"jobId\":\"job-1\",\"orderId\":\"job-1\",\"status\":\"DROPPED_OFF\",\"courierId\":\"courier-1\"}}", 200),
+            ]
+        )
+        let client = CourierBackendClient(
+            baseURL: URL(string: "http://127.0.0.1:4102")!,
+            httpClient: recorder
+        )
+
+        let accepted = try await client.acceptJob(jobId: "job-1", courierId: "courier-1")
+        #expect(accepted.status == "ACCEPTED")
+        #expect(recorder.lastPath == "/app/v1/courier/jobs/job-1/accept")
+        #expect(recorder.lastMethod == "POST")
+
+        let pickedUp = try await client.pickupJob(jobId: "job-1", courierId: "courier-1")
+        #expect(pickedUp.status == "PICKED_UP")
+        #expect(recorder.lastPath == "/app/v1/courier/jobs/job-1/pickup")
+
+        let droppedOff = try await client.dropoffJob(jobId: "job-1", courierId: "courier-1")
+        #expect(droppedOff.status == "DROPPED_OFF")
+        #expect(recorder.lastPath == "/app/v1/courier/jobs/job-1/dropoff")
+    }
+
+    @Test
     func exchangeSessionPostsToSessionExchangePath() async throws {
         let recorder = RecordingHTTPClient(
             responsesByPath: [
