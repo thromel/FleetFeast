@@ -43,10 +43,19 @@ const processes = [
     PORT: "4104"
   }),
   startProcess("web-merchant", "npm", ["--workspace", "@fleetfeast/web-merchant", "run", "dev"], {
-    OPS_BFF_BASE_URL: "http://127.0.0.1:4103"
+    OPS_BFF_BASE_URL: "http://127.0.0.1:4103",
+    NEXT_PUBLIC_REALTIME_GATEWAY_BASE_URL: "http://127.0.0.1:4104",
+    WEB_MERCHANT_OIDC_TOKEN: "dev:merchant-user-1:merchant-1@fleetfeast.dev:merchant_operator"
+  }),
+  startProcess("web-consumer", "npm", ["--workspace", "@fleetfeast/web-consumer", "run", "dev"], {
+    CONSUMER_BFF_BASE_URL: "http://127.0.0.1:4101"
+  }),
+  startProcess("web-courier", "npm", ["--workspace", "@fleetfeast/web-courier", "run", "dev"], {
+    COURIER_BFF_BASE_URL: "http://127.0.0.1:4102"
   }),
   startProcess("web-admin", "npm", ["--workspace", "@fleetfeast/web-admin", "run", "dev"], {
-    OPS_BFF_BASE_URL: "http://127.0.0.1:4103"
+    OPS_BFF_BASE_URL: "http://127.0.0.1:4103",
+    WEB_ADMIN_OIDC_TOKEN: "dev:admin-user-1:admin-1@fleetfeast.dev:system_admin"
   })
 ];
 

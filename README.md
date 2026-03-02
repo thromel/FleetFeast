@@ -208,7 +208,7 @@ go test ./...
 
 ## Runnable App Stack (Current)
 
-You can run a connected local app slice (core backend + BFFs + merchant/admin web apps) with:
+You can run a connected local app slice (core backend + BFFs + consumer/courier/merchant/admin web apps) with:
 
 ```bash
 npm run dev:web-stack
@@ -216,6 +216,8 @@ npm run dev:web-stack
 
 Then open:
 
+- `http://127.0.0.1:3003` -> consumer web app
+- `http://127.0.0.1:3004` -> courier web app
 - `http://127.0.0.1:3001` -> merchant web app
 - `http://127.0.0.1:3002` -> admin web app
 - `http://127.0.0.1:3000/health` -> core-api health
