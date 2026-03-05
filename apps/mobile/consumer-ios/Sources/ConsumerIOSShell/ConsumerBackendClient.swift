@@ -21,13 +21,19 @@ public struct URLSessionHTTPClient: HTTPClient {
     }
 }
 
-public struct ConsumerOrder: Decodable {
+public struct ConsumerOrder: Decodable, Sendable {
     public let id: String
     public let status: String
     public let timelineVersion: Int
+
+    public init(id: String, status: String, timelineVersion: Int) {
+        self.id = id
+        self.status = status
+        self.timelineVersion = timelineVersion
+    }
 }
 
-public struct ConsumerQuickOrderModifier: Codable {
+public struct ConsumerQuickOrderModifier: Codable, Sendable {
     public let name: String
     public let priceCents: Int
 
@@ -37,7 +43,7 @@ public struct ConsumerQuickOrderModifier: Codable {
     }
 }
 
-public struct ConsumerQuickOrderItem: Codable {
+public struct ConsumerQuickOrderItem: Codable, Sendable {
     public let itemId: String
     public let name: String
     public let quantity: Int
