@@ -22,6 +22,54 @@ struct ConsumerOrderConsoleView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
+                        Text("Session")
+                            .font(.headline)
+
+                        oidcTokenField
+                            .font(.callout.monospaced())
+                            .padding(10)
+                            .fleetFeastFieldBackground(in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                        HStack(spacing: 12) {
+                            Button {
+                                Task {
+                                    await model.signIn()
+                                }
+                            } label: {
+                                Label("Sign In", systemImage: "person.crop.circle.badge.checkmark")
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(model.isBusy)
+
+                            Button {
+                                Task {
+                                    await model.refreshSession()
+                                }
+                            } label: {
+                                Label("Refresh Session", systemImage: "key.horizontal")
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(model.isBusy || model.session == nil)
+                        }
+
+                        if let session = model.session {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(session.session.userId)
+                                    .font(.callout.monospaced())
+                                    .textSelection(.enabled)
+
+                                Text("refresh token id: \(session.session.refreshTokenId)")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else {
+                            Text("No active session.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Order Draft")
                             .font(.headline)
 
@@ -144,6 +192,18 @@ struct ConsumerOrderConsoleView: View {
             .keyboardType(.URL)
         #else
         TextField("Consumer BFF Base URL", text: $model.baseURLString)
+            .autocorrectionDisabled(true)
+        #endif
+    }
+
+    @ViewBuilder
+    private var oidcTokenField: some View {
+        #if os(iOS)
+        TextField("OIDC token", text: $model.oidcToken)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled(true)
+        #else
+        TextField("OIDC token", text: $model.oidcToken)
             .autocorrectionDisabled(true)
         #endif
     }

@@ -7,6 +7,12 @@ typealias ConsumerQuickOrderModifier = ConsumerIOSShell.ConsumerQuickOrderModifi
 
 typealias ConsumerQuickOrderItem = ConsumerIOSShell.ConsumerQuickOrderItem
 
+typealias AppSession = ConsumerIOSShell.AppSession
+
+typealias AppSessionTokenPair = ConsumerIOSShell.AppSessionTokenPair
+
+typealias SessionExchangeResponse = ConsumerIOSShell.SessionExchangeResponse
+
 struct ConsumerQuickCreateOrderInput: Sendable {
     let consumerId: String
     let merchantId: String
@@ -43,9 +49,15 @@ protocol ConsumerOrderingClient: Sendable {
     func fetchOrder(orderId: String) async throws -> ConsumerOrder
 }
 
+protocol ConsumerSessionClient: Sendable {
+    func signIn(oidcToken: String) async throws -> SessionExchangeResponse
+    func refreshSession() async throws -> SessionExchangeResponse
+}
+
 @MainActor
 final class ConsumerOrderConsoleViewModel: ObservableObject {
     @Published var baseURLString = "http://127.0.0.1:4101"
+    @Published var oidcToken = "dev:consumer-1:consumer-1@fleetfeast.dev:consumer"
 
     @Published var consumerId = "consumer-1"
     @Published var merchantId = "merchant-1"
@@ -58,11 +70,19 @@ final class ConsumerOrderConsoleViewModel: ObservableObject {
     @Published var isBusy = false
     @Published var lastError: String?
     @Published var order: ConsumerOrder?
+    @Published var session: SessionExchangeResponse?
 
     private let client: ConsumerOrderingClient?
+    private let sessionClient: ConsumerSessionClient?
+    private var liveSessionClient: ConsumerSessionClient?
 
-    init(client: ConsumerOrderingClient? = nil) {
+    init(
+        client: ConsumerOrderingClient? = nil,
+        sessionClient: ConsumerSessionClient? = nil
+    ) {
         self.client = client
+        self.sessionClient = sessionClient
+        self.liveSessionClient = sessionClient
     }
 
     func createOrder() async {
@@ -115,6 +135,44 @@ final class ConsumerOrderConsoleViewModel: ObservableObject {
         }
     }
 
+    func signIn() async {
+        isBusy = true
+        defer { isBusy = false }
+
+        guard let sessionClient = resolveSessionClient() else {
+            lastError = "Invalid base URL"
+            return
+        }
+
+        do {
+            let signedInSession = try await sessionClient.signIn(oidcToken: oidcToken)
+            session = signedInSession
+            consumerId = signedInSession.session.userId
+            lastError = nil
+        } catch {
+            lastError = String(describing: error)
+        }
+    }
+
+    func refreshSession() async {
+        isBusy = true
+        defer { isBusy = false }
+
+        guard let sessionClient = resolveSessionClient() else {
+            lastError = "Invalid base URL"
+            return
+        }
+
+        do {
+            let refreshedSession = try await sessionClient.refreshSession()
+            session = refreshedSession
+            consumerId = refreshedSession.session.userId
+            lastError = nil
+        } catch {
+            lastError = String(describing: error)
+        }
+    }
+
     private func resolveClient() -> ConsumerOrderingClient? {
         if let client {
             return client
@@ -125,6 +183,20 @@ final class ConsumerOrderConsoleViewModel: ObservableObject {
         }
 
         return ConsumerBackendOrderingClient(baseURL: baseURL)
+    }
+
+    private func resolveSessionClient() -> ConsumerSessionClient? {
+        if let liveSessionClient {
+            return liveSessionClient
+        }
+
+        guard let baseURL = URL(string: baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            return nil
+        }
+
+        let sessionClient = ConsumerBackendSessionClient(baseURL: baseURL)
+        liveSessionClient = sessionClient
+        return sessionClient
     }
 }
 
@@ -163,5 +235,40 @@ private struct ConsumerBackendOrderingClient: ConsumerOrderingClient {
     func fetchOrder(orderId: String) async throws -> ConsumerOrder {
         let client = ConsumerBackendClient(baseURL: baseURL)
         return try await client.fetchOrder(orderId: orderId)
+    }
+}
+
+private actor ConsumerBackendSessionClient: ConsumerSessionClient {
+    private let baseURL: URL
+    private var activeSession: SessionExchangeResponse?
+
+    init(baseURL: URL) {
+        self.baseURL = baseURL
+    }
+
+    func signIn(oidcToken: String) async throws -> SessionExchangeResponse {
+        let client = ConsumerBackendClient(baseURL: baseURL)
+        let response = try await client.exchangeSession(
+            oidcToken: oidcToken,
+            traceId: "ios-consumer-signin-\(UUID().uuidString.lowercased())",
+            deviceId: "consumer-ios-local"
+        )
+        activeSession = response
+        return response
+    }
+
+    func refreshSession() async throws -> SessionExchangeResponse {
+        guard let refreshToken = activeSession?.tokenPair.refreshToken else {
+            throw ConsumerAuthSessionManagerError.missingSession
+        }
+
+        let client = ConsumerBackendClient(baseURL: baseURL)
+        let response = try await client.refreshSession(
+            refreshToken: refreshToken,
+            traceId: "ios-consumer-refresh-\(UUID().uuidString.lowercased())",
+            deviceId: "consumer-ios-local"
+        )
+        activeSession = response
+        return response
     }
 }

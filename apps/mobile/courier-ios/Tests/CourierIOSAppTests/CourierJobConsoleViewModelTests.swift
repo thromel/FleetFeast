@@ -5,6 +5,52 @@ import Testing
 @MainActor
 struct CourierJobConsoleViewModelTests {
     @Test
+    func signInStoresSessionAndHydratesCourierId() async {
+        let jobsClient = FakeCourierJobsClient(
+            loadJobsResult: .success([]),
+            acceptResult: .success(.init(jobId: "job-1", orderId: "order-1", status: "ACCEPTED", courierId: "courier-42")),
+            pickupResult: .success(.init(jobId: "job-1", orderId: "order-1", status: "PICKED_UP", courierId: "courier-42")),
+            dropoffResult: .success(.init(jobId: "job-1", orderId: "order-1", status: "DROPPED_OFF", courierId: "courier-42"))
+        )
+        let sessionClient = FakeCourierSessionClient(
+            signInResult: .success(makeCourierSessionResponse(userId: "courier-42", accessToken: "access-1", refreshToken: "refresh-1")),
+            refreshResult: .success(makeCourierSessionResponse(userId: "courier-42", accessToken: "access-2", refreshToken: "refresh-2"))
+        )
+
+        let model = CourierJobConsoleViewModel(client: jobsClient, sessionClient: sessionClient)
+        model.oidcToken = "dev:courier-42:courier-42@fleetfeast.dev:courier"
+
+        await model.signIn()
+
+        #expect(model.lastError == nil)
+        #expect(model.session?.session.userId == "courier-42")
+        #expect(model.courierId == "courier-42")
+        #expect(await sessionClient.signInCallCount == 1)
+    }
+
+    @Test
+    func refreshSessionUpdatesStoredTokenPair() async {
+        let jobsClient = FakeCourierJobsClient(
+            loadJobsResult: .success([]),
+            acceptResult: .success(.init(jobId: "job-1", orderId: "order-1", status: "ACCEPTED", courierId: "courier-42")),
+            pickupResult: .success(.init(jobId: "job-1", orderId: "order-1", status: "PICKED_UP", courierId: "courier-42")),
+            dropoffResult: .success(.init(jobId: "job-1", orderId: "order-1", status: "DROPPED_OFF", courierId: "courier-42"))
+        )
+        let sessionClient = FakeCourierSessionClient(
+            signInResult: .success(makeCourierSessionResponse(userId: "courier-42", accessToken: "access-1", refreshToken: "refresh-1")),
+            refreshResult: .success(makeCourierSessionResponse(userId: "courier-42", accessToken: "access-2", refreshToken: "refresh-2"))
+        )
+
+        let model = CourierJobConsoleViewModel(client: jobsClient, sessionClient: sessionClient)
+        await model.signIn()
+
+        await model.refreshSession()
+
+        #expect(model.session?.tokenPair.accessToken == "access-2")
+        #expect(await sessionClient.refreshCallCount == 1)
+    }
+
+    @Test
     func loadJobsSuccessStoresJobsAndClearsError() async {
         let client = FakeCourierJobsClient(
             loadJobsResult: .success([
@@ -100,6 +146,29 @@ enum FakeCourierJobsClientError: Error {
     case stub
 }
 
+actor FakeCourierSessionClient: CourierSessionClient {
+    private let signInResult: Result<SessionExchangeResponse, Error>
+    private let refreshResult: Result<SessionExchangeResponse, Error>
+
+    private(set) var signInCallCount = 0
+    private(set) var refreshCallCount = 0
+
+    init(signInResult: Result<SessionExchangeResponse, Error>, refreshResult: Result<SessionExchangeResponse, Error>) {
+        self.signInResult = signInResult
+        self.refreshResult = refreshResult
+    }
+
+    func signIn(oidcToken: String) async throws -> SessionExchangeResponse {
+        signInCallCount += 1
+        return try signInResult.get()
+    }
+
+    func refreshSession() async throws -> SessionExchangeResponse {
+        refreshCallCount += 1
+        return try refreshResult.get()
+    }
+}
+
 actor FakeCourierJobsClient: CourierJobsClient {
     private let loadJobsResult: Result<[CourierJob], Error>
     private let acceptResult: Result<CourierJob, Error>
@@ -142,4 +211,31 @@ actor FakeCourierJobsClient: CourierJobsClient {
         dropoffCallCount += 1
         return try dropoffResult.get()
     }
+}
+
+private func makeCourierSessionResponse(
+    userId: String,
+    accessToken: String,
+    refreshToken: String
+) -> SessionExchangeResponse {
+    SessionExchangeResponse(
+        session: AppSession(
+            sessionId: "session-\(accessToken)",
+            userId: userId,
+            role: "courier",
+            persona: "courier",
+            traceId: "trace-\(accessToken)",
+            refreshTokenId: "rt-\(refreshToken)",
+            issuedAt: "2026-02-19T00:00:00Z",
+            expiresAt: "2026-02-19T01:00:00Z"
+        ),
+        tokenPair: AppSessionTokenPair(
+            tokenType: "Bearer",
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            expiresInSeconds: 3600,
+            refreshExpiresInSeconds: 2_592_000,
+            refreshExpiresAt: "2026-03-21T00:00:00Z"
+        )
+    )
 }
