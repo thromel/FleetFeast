@@ -462,7 +462,7 @@ Last updated: `2026-03-06`
 | A02 Persona BFF services + realtime gateway skeleton | Done | `consumer-bff`, `courier-bff`, `ops-bff`, and `realtime-gateway` implemented with route-level tests |
 | A03 BFF-to-core backend connectivity | Done | Core API adapters implemented in all three BFFs with test coverage against backend HTTP stubs |
 | A04 App runtime bootstrap for BFF services | Done | `main.ts` entrypoints and `start` scripts added for local runtime |
-| A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js surfaces are live; mobile now includes tested `shared-kmp` contracts/offline queue + queue-store rehydration + JVM file-backed persistent store + typed BFF/realtime clients + feature-flag client baseline + HTTP transport adapter boundary + default JSON mapper + JVM HTTP executor + courier replay workflow service + consumer/courier/ops BFF-backed remote feature-flag snapshot support + startup bootstrap orchestrators + Swift Package iOS shell baselines with backend clients + Kotlin Android shell module baselines with backend clients + native iOS/Android app-session exchange/refresh client contracts + native auth-session manager layer for sign-in/refresh orchestration + shell-level factory wiring for backend/auth manager creation + web merchant/admin session exchange helpers with optional app-session token forwarding + web merchant/admin session refresh helpers + web merchant/admin auth-session manager layer for sign-in/refresh state orchestration + web merchant/admin feature-flag snapshot helpers rendered in dashboards via ops-bff `/feature-flags` routes + merchant payout statement projection from core-api through ops-bff to web merchant dashboard + admin SLO dashboard projection from core-api through ops-bff to web admin dashboard + persona-scoped app-session bearer authz enforced on ops-bff data routes with web dashboards gated on active app sessions + core-api realtime relay for order/dispatch events into consumer/merchant/courier app channels via `realtime-gateway` publish API + runnable consumer/courier web consoles + merchant order action controls/realtime panel + browser-validated end-to-end journey (create -> accept -> dispatch -> pickup -> dropoff -> delivered) + SwiftUI `ConsumerIOSApp` order console (SwiftPM executable) wired to consumer-bff create/refresh paths + SwiftUI `CourierIOSApp` jobs console (SwiftPM executable) wired to courier-bff load/accept/pickup/dropoff paths + native consumer/courier session sections that execute live app-session exchange and refresh flows inside the SwiftUI shells + one-tap native `Run Demo` actions that chain sign-in into first meaningful app behavior + installable `ConsumerIOSDemo.xcodeproj` simulator wrapper with smoke-test coverage |
+| A05 Mobile/web app surfaces (native + Next.js) | In progress | Next.js surfaces are live; mobile now includes tested `shared-kmp` contracts/offline queue + queue-store rehydration + JVM file-backed persistent store + typed BFF/realtime clients + feature-flag client baseline + HTTP transport adapter boundary + default JSON mapper + JVM HTTP executor + courier replay workflow service + consumer/courier/ops BFF-backed remote feature-flag snapshot support + startup bootstrap orchestrators + Swift Package iOS shell baselines with backend clients + Kotlin Android shell module baselines with backend clients + native iOS/Android app-session exchange/refresh client contracts + native auth-session manager layer for sign-in/refresh orchestration + shell-level factory wiring for backend/auth manager creation + web merchant/admin session exchange helpers with optional app-session token forwarding + web merchant/admin session refresh helpers + web merchant/admin auth-session manager layer for sign-in/refresh state orchestration + web merchant/admin feature-flag snapshot helpers rendered in dashboards via ops-bff `/feature-flags` routes + merchant payout statement projection from core-api through ops-bff to web merchant dashboard + admin SLO dashboard projection from core-api through ops-bff to web admin dashboard + persona-scoped app-session bearer authz enforced on ops-bff data routes with web dashboards gated on active app sessions + core-api realtime relay for order/dispatch events into consumer/merchant/courier app channels via `realtime-gateway` publish API + runnable consumer/courier web consoles + merchant order action controls/realtime panel + browser-validated end-to-end journey (create -> accept -> dispatch -> pickup -> dropoff -> delivered) + redesigned consumer/merchant/courier/admin web demo surfaces with cross-linked storytelling, stronger visual polish, and courier continuation controls after accept/pickup so the browser demo remains functional through dropoff + SwiftUI `ConsumerIOSApp` order console (SwiftPM executable) wired to consumer-bff create/refresh paths + SwiftUI `CourierIOSApp` jobs console (SwiftPM executable) wired to courier-bff load/accept/pickup/dropoff paths + native consumer/courier session sections that execute live app-session exchange and refresh flows inside the SwiftUI shells + one-tap native `Run Demo` actions that chain sign-in into first meaningful app behavior + installable `ConsumerIOSDemo.xcodeproj` simulator wrapper with smoke-test coverage |
 | A06 OIDC+PKCE and app-session exchange hardening | Done | Added shared OIDC verifier (JWKS + dev fallback), persona-aware role checks, rotating refresh tokens, replay detection, and device-bound refresh validation across all BFFs |
 | A07 Push fallback (APNs/FCM) and full realtime fanout | Done | Added provider-specific APNs/FCM fallback adapters, internal publish endpoint with optional API-key guard, and full realtime gateway route/adapter test coverage |
 
@@ -470,6 +470,10 @@ Last updated: `2026-03-06`
 
 | Commit | Story Mapping | Outcome |
 |---|---|---|
+| `9d96dec` | A05 | Redesigned the admin web surface into a client-demo-ready operations room with service health, incidents, rollout controls, and cross-surface navigation |
+| `bf5451a` | A05 | Redesigned the courier web surface into a fulfillment board with state-aware action controls and cross-surface navigation for the demo journey |
+| `ce13380` | A05 | Redesigned the merchant web surface into a polished dispatch desk with queue focus, realtime rail, and rollout/payout context |
+| `b2582e5` | A05 | Added shared demo surface/stage helpers and redesigned the consumer web surface into a guided client-demo order journey |
 | `98cf9cd` | A05 | Added installable `ConsumerIOSDemo.xcodeproj` wrapper and smoke-test build script so the consumer iOS demo can run on the simulator as a real `.app` bundle |
 | `98cf9cd` | A05 | Added one-tap native `Run Demo` actions in consumer/courier iOS shells so the demo path signs in and immediately creates an order or loads jobs |
 | `9cc65f3` | A05 | Added native consumer and courier iOS session sections with sign-in/refresh controls, cached session state in SwiftUI view models, and app tests covering session hydration + token rotation |
@@ -539,106 +543,115 @@ Last updated: `2026-03-06`
    - APNs and FCM payload routing through provider-specific adapters
    - `/app/v1/realtime/publish` websocket fanout path
    - optional `REALTIME_PUBLISH_API_KEY` authorization enforcement
-7. Mobile shared-core baseline validated via Docker Gradle KMP tests:
+7. Client-demo backend flow validation executed via `npm run test:functional-flow` with delivered-order result:
+   - `status: ok`
+   - `finalOrderStatus: DELIVERED`
+   - realtime events observed: `order.confirmed.v1`, `dispatch.assignment.requested.v1`, `dispatch.assignment.completed.v1`, `order.picked_up.v1`, `order.delivered.v1`
+8. Browser demo validation executed against `npm run dev:web-stack` with Playwright on `2026-03-06`:
+   - consumer surface created a live order and exposed the generated order id in the UI
+   - merchant surface accepted and dispatched that order with polished state transitions
+   - courier surface accepted, picked up, and dropped off the same job using continuation controls after accept
+   - consumer surface reflected the final `DELIVERED` state and admin surface rendered the redesigned operations room
+9. Mobile shared-core baseline validated via Docker Gradle KMP tests:
    - `npm run test:mobile-shared-kmp`
    - verifies offline action queue idempotency and retry semantics in `apps/mobile/shared-kmp`
-8. Mobile shared-kmp client adapter validation:
+10. Mobile shared-kmp client adapter validation:
    - verifies typed route mapping for consumer/courier/ops/realtime clients
    - verifies realtime publish API-key header propagation and merchant query mapping
-9. Mobile queue persistence validation:
+11. Mobile queue persistence validation:
    - verifies `PersistentOfflineActionQueue` rehydrates action state across queue instances
    - verifies offline action ID sequence continuity after restart simulation
-10. Mobile feature-flag client validation:
+12. Mobile feature-flag client validation:
    - verifies TTL-bound cached snapshot reuse
    - verifies refresh behavior after TTL expiry and force-refresh override
-11. Mobile HTTP transport adapter validation:
+13. Mobile HTTP transport adapter validation:
    - verifies URL/query encoding and request header/body mapping
    - verifies consumer typed client behavior over HTTP transport contract path
-12. Mobile courier replay workflow validation:
+14. Mobile courier replay workflow validation:
    - verifies replay is gated by `courier.offlineReplay` feature flag
    - verifies successful dispatch marks actions `SUCCEEDED` and failed dispatch schedules retry
-13. Mobile concrete transport validation:
+15. Mobile concrete transport validation:
    - verifies `DefaultJsonHttpBodyMapper` encodes/decodes typed app contracts
    - verifies typed consumer client calls live HTTP endpoints through `JvmHttpTransportExecutor`
-14. Remote feature-flag source integration validation:
+16. Remote feature-flag source integration validation:
    - verifies `GET /app/v1/courier/feature-flags` returns typed snapshot payload in courier-bff
    - verifies `GET /app/v1/consumer/feature-flags` returns typed snapshot payload in consumer-bff
    - verifies `GET /app/v1/merchant/feature-flags` and `GET /app/v1/admin/feature-flags` return typed snapshots in ops-bff
    - verifies `ConsumerBffClient.getFeatureFlags`, `CourierBffClient.getFeatureFlags`, `OpsBffClient.getMerchantFeatureFlags`, and `OpsBffClient.getAdminFeatureFlags` query mapping plus snapshot source fetch behavior
-15. JVM file-backed persistence validation:
+17. JVM file-backed persistence validation:
    - verifies `JvmJsonFileOfflineActionStore` returns empty when no store file exists
    - verifies JSON round-trip persistence and queue rehydration across `PersistentOfflineActionQueue` instances
-16. Shared-kmp startup bootstrap validation:
+18. Shared-kmp startup bootstrap validation:
    - verifies consumer bootstrap performs session exchange and feature-flag hydration
    - verifies courier bootstrap performs session exchange, available jobs load, and feature-flag hydration
    - verifies ops bootstrap performs merchant/admin session exchange and corresponding initial view hydration
-17. iOS shell package validation:
+19. iOS shell package validation:
    - verifies consumer and courier Swift Package shell modules compile and pass unit tests via `npm run test:mobile-ios-shells`
    - verifies shell route helpers align with BFF/realtime app-layer paths
-18. Android shell module validation:
+20. Android shell module validation:
    - verifies consumer and courier Kotlin shell modules compile and pass Gradle tests via `npm run test:mobile-android-shells`
    - verifies shell route helpers align with BFF/realtime app-layer paths
-19. Native shell backend-client validation:
+21. Native shell backend-client validation:
    - verifies consumer/courier iOS backend clients map order/jobs and feature-flag routes with typed decode behavior
    - verifies consumer/courier Android backend clients map order/jobs and feature-flag routes with typed decode behavior
-20. Native app-session exchange client validation:
+22. Native app-session exchange client validation:
    - verifies consumer/courier iOS backend clients POST `/app/v1/{persona}/session/exchange` with OIDC payload and decode typed token/session response
    - verifies consumer/courier Android backend clients POST `/app/v1/{persona}/session/exchange` with OIDC payload and decode typed token/session response
-21. Native app-session refresh client validation:
+23. Native app-session refresh client validation:
    - verifies consumer/courier iOS backend clients POST `/app/v1/{persona}/session/refresh` with refresh payload and decode typed token/session response
    - verifies consumer/courier Android backend clients POST `/app/v1/{persona}/session/refresh` with refresh payload and decode typed token/session response
-22. Native auth-session manager validation:
+24. Native auth-session manager validation:
    - verifies consumer/courier iOS auth-session managers persist active session, reuse stored refresh token, and refresh session state
    - verifies consumer/courier Android auth-session managers persist active session, reuse stored refresh token, and reject refresh without an active session
-23. Native shell factory wiring validation:
+25. Native shell factory wiring validation:
    - verifies consumer/courier iOS shells create auth-session managers bound to configured BFF base URL and execute session exchange through shell-created manager instances
    - verifies consumer/courier Android shells create auth-session managers bound to configured BFF base URL and execute session exchange through shell-created manager instances
-24. Web ops-session auth readiness validation:
+26. Web ops-session auth readiness validation:
    - verifies `exchangeMerchantSession` and `exchangeAdminSession` POST persona-scoped session exchange payloads and return typed app-session bundles with token-pair values
    - verifies `fetchMerchantOrders` and `fetchAdminIncidents` forward optional bearer app-session tokens to ops-bff routes when configured
-25. Web ops-session refresh validation:
+27. Web ops-session refresh validation:
    - verifies `refreshMerchantSession` and `refreshAdminSession` POST persona-scoped session refresh payloads and return typed refreshed session/token bundles
    - verifies refresh helper coverage remains green within `npm run test:app-layer` workspace gates
-26. Web auth-session manager validation:
+28. Web auth-session manager validation:
    - verifies `MerchantAuthSessionManager` and `AdminAuthSessionManager` persist active session state after sign-in
    - verifies manager refresh flow reuses stored refresh token and updates active session token state
    - verifies manager refresh rejects when no active session exists
-27. Web feature-flag snapshot validation:
+29. Web feature-flag snapshot validation:
    - verifies `fetchMerchantFeatureFlags` and `fetchAdminFeatureFlags` call persona-scoped ops-bff `/feature-flags` routes with required query context
    - verifies feature-flag API helpers forward optional app-session bearer tokens and decode typed snapshot payloads for dashboard rendering
-28. Merchant payout projection validation:
+30. Merchant payout projection validation:
    - verifies ops-bff serves `GET /app/v1/merchant/payouts?merchantId=...` and maps core-api `/api/v1/merchant/payouts` payloads
    - verifies `fetchMerchantPayoutStatements` forwards optional app-session bearer token and decodes typed payout statement collections for the merchant dashboard
-29. Admin SLO dashboard projection validation:
+31. Admin SLO dashboard projection validation:
    - verifies ops-bff serves `GET /app/v1/admin/slo-dashboard` and maps core-api `/internal/observability/slo/dashboard` payloads
    - verifies `fetchAdminSloDashboard` forwards optional app-session bearer token and decodes typed SLO metrics/breach entries for the admin dashboard
-30. Ops data-route authz validation:
+32. Ops data-route authz validation:
    - verifies ops-bff requires bearer access tokens on merchant/admin data routes and rejects cross-persona access with `APP_ROUTE_FORBIDDEN`
    - verifies merchant/admin web pages only attempt protected data fetches when an app session token is present (env token or OIDC exchange bootstrap)
-31. Admin compliance audit feed validation:
+33. Admin compliance audit feed validation:
    - verifies ops-bff serves `GET /app/v1/admin/compliance/audit-events` and maps core-api `/internal/risk/compliance/audit/events` payloads
    - verifies `fetchAdminComplianceAuditEvents` forwards optional app-session bearer token and decodes typed compliance-audit event collections for the admin dashboard
-32. Functional realtime relay validation:
+34. Functional realtime relay validation:
    - verifies `core-api` maps `order.*` and `dispatch.assignment.*` domain events into `consumer.order.{orderId}` and `merchant.order.{orderId}` realtime channels, and adds `courier.job.{orderId}` when `courierId` is present
    - verifies `HttpRealtimeEventPublisher` posts channel+envelope payloads to `realtime-gateway` `/app/v1/realtime/publish` with optional API-key header
    - verifies server wiring publishes realtime envelopes through configured publisher during create -> merchant accept -> dispatch assignment flow
-33. Consumer web flow validation via Playwright:
+35. Consumer web flow validation via Playwright:
    - verifies `http://127.0.0.1:3003` creates an order through `/quick-create` route and renders created order status from `consumer-bff`
-34. Merchant + courier action validation via Playwright:
+36. Merchant + courier action validation via Playwright:
    - verifies `http://127.0.0.1:3001` executes merchant `accept` and `request-dispatch` actions through `ops-bff` and updates order state
    - verifies `http://127.0.0.1:3004` executes courier accept/pickup/dropoff actions through `courier-bff` routes
-35. Browser end-to-end journey validation:
+37. Browser end-to-end journey validation:
    - verifies consumer order transitions to `DELIVERED` after merchant and courier web actions using shared local stack (`npm run dev:web-stack`)
-36. Native courier iOS package validation:
+38. Native courier iOS package validation:
    - verifies `apps/mobile/courier-ios` compiles as a SwiftPM executable and passes view-model tests for job load plus accept/pickup/dropoff status transitions
    - verifies repo-level `npm run test:mobile-ios-shells` remains green across both consumer and courier iOS packages
-37. Native iOS session-flow validation:
+39. Native iOS session-flow validation:
    - verifies consumer and courier SwiftUI app view models persist session state after sign-in, hydrate actor IDs from session user IDs, and rotate token state on refresh
    - verifies live `POST /app/v1/consumer/session/exchange`, `POST /app/v1/consumer/session/refresh`, `POST /app/v1/courier/session/exchange`, and `POST /app/v1/courier/session/refresh` succeed against the local stack with device-bound refresh continuity
-38. Native iOS demo-action validation:
+40. Native iOS demo-action validation:
    - verifies consumer `Run Demo` signs in and creates a sample order in a single app action
    - verifies courier `Run Demo` signs in and loads available jobs in a single app action
-39. Native consumer simulator-app validation:
+41. Native consumer simulator-app validation:
    - verifies `apps/mobile/consumer-ios/scripts/smoke-test-ios-demo.sh` builds an installable `ConsumerIOSDemo.app` bundle from `ConsumerIOSDemo.xcodeproj`
    - verifies `xcrun simctl install booted` installs bundle id `com.fleetfeast.consumer.demo` on the iPhone 17 Pro simulator
    - verifies the launched simulator app renders the FleetFeast consumer shell UI with default `consumer-bff` base URL (`http://127.0.0.1:4101`) and in-app `Run Demo` action available for manual backend exercise
