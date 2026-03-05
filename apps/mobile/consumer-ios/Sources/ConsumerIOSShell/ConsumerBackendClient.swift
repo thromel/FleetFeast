@@ -65,13 +65,13 @@ public struct ConsumerQuickOrderItem: Codable, Sendable {
     }
 }
 
-public struct FeatureFlagSnapshot: Decodable {
+public struct FeatureFlagSnapshot: Decodable, Sendable {
     public let flags: [String: Bool]
     public let ttlSeconds: Int
     public let generatedAtEpochMillis: Int64
 }
 
-public struct AppSession: Decodable {
+public struct AppSession: Decodable, Sendable {
     public let sessionId: String
     public let userId: String
     public let role: String
@@ -80,20 +80,61 @@ public struct AppSession: Decodable {
     public let refreshTokenId: String
     public let issuedAt: String
     public let expiresAt: String
+
+    public init(
+        sessionId: String,
+        userId: String,
+        role: String,
+        persona: String,
+        traceId: String,
+        refreshTokenId: String,
+        issuedAt: String,
+        expiresAt: String
+    ) {
+        self.sessionId = sessionId
+        self.userId = userId
+        self.role = role
+        self.persona = persona
+        self.traceId = traceId
+        self.refreshTokenId = refreshTokenId
+        self.issuedAt = issuedAt
+        self.expiresAt = expiresAt
+    }
 }
 
-public struct AppSessionTokenPair: Decodable {
+public struct AppSessionTokenPair: Decodable, Sendable {
     public let tokenType: String
     public let accessToken: String
     public let refreshToken: String
     public let expiresInSeconds: Int
     public let refreshExpiresInSeconds: Int
     public let refreshExpiresAt: String
+
+    public init(
+        tokenType: String,
+        accessToken: String,
+        refreshToken: String,
+        expiresInSeconds: Int,
+        refreshExpiresInSeconds: Int,
+        refreshExpiresAt: String
+    ) {
+        self.tokenType = tokenType
+        self.accessToken = accessToken
+        self.refreshToken = refreshToken
+        self.expiresInSeconds = expiresInSeconds
+        self.refreshExpiresInSeconds = refreshExpiresInSeconds
+        self.refreshExpiresAt = refreshExpiresAt
+    }
 }
 
-public struct SessionExchangeResponse: Decodable {
+public struct SessionExchangeResponse: Decodable, Sendable {
     public let session: AppSession
     public let tokenPair: AppSessionTokenPair
+
+    public init(session: AppSession, tokenPair: AppSessionTokenPair) {
+        self.session = session
+        self.tokenPair = tokenPair
+    }
 }
 
 public enum ConsumerBackendClientError: Error {
