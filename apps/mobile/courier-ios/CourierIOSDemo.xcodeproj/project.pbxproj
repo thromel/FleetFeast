@@ -12,6 +12,7 @@
 		16EA330D2512CB00B05802BE /* CourierJobConsoleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF0BE8F5AB14350C6E748FCC /* CourierJobConsoleView.swift */; };
 		315AA39FFF1AAE4B3AFBD452 /* CourierAuthSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 641960178826E7B5C236E832 /* CourierAuthSessionManager.swift */; };
 		34CE1D37BAC649B0555F190D /* CourierIOSShell.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = CA27A3DAB581122C68A5D8BE /* CourierIOSShell.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		3ECEB632CDBD0F87F76B58C9 /* CourierDemoPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3281C8E079F88B856BE0EB7D /* CourierDemoPresentation.swift */; };
 		63C9311DC6F4EC336F823277 /* CourierJobConsoleViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC302450262F5C96C06AE7AF /* CourierJobConsoleViewModel.swift */; };
 		AAFCB2E90771DE4C705B1A10 /* CourierIOSShell.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CA27A3DAB581122C68A5D8BE /* CourierIOSShell.framework */; };
 		ACF5CA4F6BD506F972156E32 /* CourierIOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45F889881C46ECDBEFE97B94 /* CourierIOSApp.swift */; };
@@ -43,6 +44,7 @@
 
 /* Begin PBXFileReference section */
 		1A330A6C0A2E1586867B332F /* CourierBackendClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourierBackendClient.swift; sourceTree = "<group>"; };
+		3281C8E079F88B856BE0EB7D /* CourierDemoPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourierDemoPresentation.swift; sourceTree = "<group>"; };
 		45F889881C46ECDBEFE97B94 /* CourierIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourierIOSApp.swift; sourceTree = "<group>"; };
 		641960178826E7B5C236E832 /* CourierAuthSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourierAuthSessionManager.swift; sourceTree = "<group>"; };
 		BC302450262F5C96C06AE7AF /* CourierJobConsoleViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourierJobConsoleViewModel.swift; sourceTree = "<group>"; };
@@ -94,6 +96,7 @@
 		F9B3AF03FBC0456160D9EE70 /* CourierIOSApp */ = {
 			isa = PBXGroup;
 			children = (
+				3281C8E079F88B856BE0EB7D /* CourierDemoPresentation.swift */,
 				45F889881C46ECDBEFE97B94 /* CourierIOSApp.swift */,
 				DF0BE8F5AB14350C6E748FCC /* CourierJobConsoleView.swift */,
 				BC302450262F5C96C06AE7AF /* CourierJobConsoleViewModel.swift */,
@@ -196,6 +199,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3ECEB632CDBD0F87F76B58C9 /* CourierDemoPresentation.swift in Sources */,
 				ACF5CA4F6BD506F972156E32 /* CourierIOSApp.swift in Sources */,
 				16EA330D2512CB00B05802BE /* CourierJobConsoleView.swift in Sources */,
 				63C9311DC6F4EC336F823277 /* CourierJobConsoleViewModel.swift in Sources */,

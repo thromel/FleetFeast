@@ -78,6 +78,43 @@ struct CourierJobConsoleViewModelTests {
     }
 
     @Test
+    func focusJobPrefersActiveDeliveryWorkOverQueuedJobs() async {
+        let client = FakeCourierJobsClient(
+            loadJobsResult: .success([]),
+            acceptResult: .success(.init(jobId: "job-2", orderId: "order-2", status: "ACCEPTED", courierId: "courier-1")),
+            pickupResult: .success(.init(jobId: "job-2", orderId: "order-2", status: "PICKED_UP", courierId: "courier-1")),
+            dropoffResult: .success(.init(jobId: "job-2", orderId: "order-2", status: "DELIVERED", courierId: "courier-1"))
+        )
+
+        let model = CourierJobConsoleViewModel(client: client)
+        model.jobs = [
+            .init(jobId: "job-1", orderId: "order-1", status: "AVAILABLE", courierId: nil),
+            .init(jobId: "job-2", orderId: "order-2", status: "ACCEPTED", courierId: "courier-1"),
+            .init(jobId: "job-3", orderId: "order-3", status: "DELIVERED", courierId: "courier-1"),
+        ]
+
+        #expect(model.focusJob?.jobId == "job-2")
+        #expect(model.focusDescriptor.label == "Head to Pickup")
+        #expect(model.focusDescriptor.progress == 0.55)
+    }
+
+    @Test
+    func focusDescriptorFallsBackToReadyStateWhenNoJobsAreLoaded() async {
+        let client = FakeCourierJobsClient(
+            loadJobsResult: .success([]),
+            acceptResult: .success(.init(jobId: "job-1", orderId: "order-1", status: "ACCEPTED", courierId: "courier-1")),
+            pickupResult: .success(.init(jobId: "job-1", orderId: "order-1", status: "PICKED_UP", courierId: "courier-1")),
+            dropoffResult: .success(.init(jobId: "job-1", orderId: "order-1", status: "DELIVERED", courierId: "courier-1"))
+        )
+
+        let model = CourierJobConsoleViewModel(client: client)
+
+        #expect(model.focusJob == nil)
+        #expect(model.focusDescriptor.label == "Waiting for Work")
+        #expect(model.focusDescriptor.persona == "Dispatch")
+    }
+
+    @Test
     func loadJobsSuccessStoresJobsAndClearsError() async {
         let client = FakeCourierJobsClient(
             loadJobsResult: .success([

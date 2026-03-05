@@ -45,6 +45,14 @@ final class CourierJobConsoleViewModel: ObservableObject {
         self.liveSessionClient = sessionClient
     }
 
+    var focusJob: CourierJob? {
+        resolveCourierFocusJob(from: jobs)
+    }
+
+    var focusDescriptor: CourierJobFocusDescriptor {
+        CourierJobFocusDescriptor(status: focusJob?.status)
+    }
+
     func loadJobs() async {
         isBusy = true
         defer { isBusy = false }
