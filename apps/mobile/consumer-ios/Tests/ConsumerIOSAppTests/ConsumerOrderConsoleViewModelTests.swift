@@ -71,6 +71,46 @@ struct ConsumerOrderConsoleViewModelTests {
     }
 
     @Test
+    func applyPresetHydratesDraftAndUpdatesTotal() async {
+        let client = FakeConsumerOrderingClient(
+            createOrderResult: .success(.init(id: "order-1", status: "CREATED", timelineVersion: 0)),
+            fetchOrderResult: .success(.init(id: "order-1", status: "CREATED", timelineVersion: 0))
+        )
+
+        let model = ConsumerOrderConsoleViewModel(client: client)
+        model.quantity = 2
+
+        model.applyPreset(.familySizzle)
+
+        #expect(model.itemName == "Family Sizzle Box")
+        #expect(model.unitPriceCents == 1895)
+        #expect(model.modifierName == "Calamansi Slaw")
+        #expect(model.modifierPriceCents == 145)
+        #expect(model.draftTotalCents == 4_080)
+    }
+
+    @Test
+    func orderStageReflectsBackendStatusForTimelineUi() async {
+        let client = FakeConsumerOrderingClient(
+            createOrderResult: .success(.init(id: "order-1", status: "CREATED", timelineVersion: 0)),
+            fetchOrderResult: .success(.init(id: "order-1", status: "CREATED", timelineVersion: 0))
+        )
+
+        let model = ConsumerOrderConsoleViewModel(client: client)
+
+        #expect(model.stageDescriptor.label == "Ready to Order")
+        #expect(model.stageDescriptor.progress == 0.12)
+
+        model.order = .init(id: "order-1", status: "DISPATCH_PENDING", timelineVersion: 2)
+        #expect(model.stageDescriptor.label == "Dispatching")
+        #expect(model.stageDescriptor.persona == "Ops")
+
+        model.order = .init(id: "order-1", status: "DELIVERED", timelineVersion: 5)
+        #expect(model.stageDescriptor.label == "Delivered")
+        #expect(model.stageDescriptor.progress == 1.0)
+    }
+
+    @Test
     func createOrderSuccessStoresOrderAndClearsError() async {
         let client = FakeConsumerOrderingClient(
             createOrderResult: .success(.init(id: "order-1", status: "CREATED", timelineVersion: 0)),

@@ -56,16 +56,17 @@ protocol ConsumerSessionClient: Sendable {
 
 @MainActor
 final class ConsumerOrderConsoleViewModel: ObservableObject {
+    @Published var selectedPreset: ConsumerMenuPreset = .weeknightCrunch
     @Published var baseURLString = "http://127.0.0.1:4101"
     @Published var oidcToken = "dev:consumer-1:consumer-1@fleetfeast.dev:consumer"
 
     @Published var consumerId = "consumer-1"
     @Published var merchantId = "merchant-1"
-    @Published var itemName = "Chicken Rice"
+    @Published var itemName = ConsumerMenuPreset.weeknightCrunch.itemName
     @Published var quantity = 1
-    @Published var unitPriceCents = 1250
-    @Published var modifierName: String = ""
-    @Published var modifierPriceCents: Int = 0
+    @Published var unitPriceCents = ConsumerMenuPreset.weeknightCrunch.unitPriceCents
+    @Published var modifierName: String = ConsumerMenuPreset.weeknightCrunch.modifierName
+    @Published var modifierPriceCents: Int = ConsumerMenuPreset.weeknightCrunch.modifierPriceCents
 
     @Published var isBusy = false
     @Published var lastError: String?
@@ -83,6 +84,22 @@ final class ConsumerOrderConsoleViewModel: ObservableObject {
         self.client = client
         self.sessionClient = sessionClient
         self.liveSessionClient = sessionClient
+    }
+
+    var draftTotalCents: Int {
+        quantity * (unitPriceCents + max(modifierPriceCents, 0))
+    }
+
+    var stageDescriptor: ConsumerOrderStageDescriptor {
+        ConsumerOrderStageDescriptor(status: order?.status)
+    }
+
+    func applyPreset(_ preset: ConsumerMenuPreset) {
+        selectedPreset = preset
+        itemName = preset.itemName
+        unitPriceCents = preset.unitPriceCents
+        modifierName = preset.modifierName
+        modifierPriceCents = preset.modifierPriceCents
     }
 
     func createOrder() async {

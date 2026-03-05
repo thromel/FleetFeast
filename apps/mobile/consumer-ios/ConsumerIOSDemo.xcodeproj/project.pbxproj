@@ -10,6 +10,7 @@
 		35E9FA77684DAC5AF08050F8 /* ConsumerOrderConsoleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 337785A1A0DB345905262CF3 /* ConsumerOrderConsoleView.swift */; };
 		417F8A6825685E94F00CDB7B /* ConsumerIOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93AFF5BF03DF79F3029DAEE5 /* ConsumerIOSApp.swift */; };
 		5024AC72E4B3F39A2C712CB5 /* ConsumerOrderConsoleViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CD2A436FB4C1BB4B2125B3E /* ConsumerOrderConsoleViewModel.swift */; };
+		5C7A021A3F0832C70F7396BB /* ConsumerDemoPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76A1BB85C2E9A2EF7F85E8F5 /* ConsumerDemoPresentation.swift */; };
 		767F072984565A351C0AF35B /* ConsumerIOSShell.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2BA776A784F8E3AAD5AE1071 /* ConsumerIOSShell.framework */; };
 		85E220D248F5A08F27C4E41A /* ConsumerIOSShell.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 2BA776A784F8E3AAD5AE1071 /* ConsumerIOSShell.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		9F8E46BC1FE00417ACE66D4B /* ConsumerAuthSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD32103257580924075D3E6 /* ConsumerAuthSessionManager.swift */; };
@@ -46,6 +47,7 @@
 		337785A1A0DB345905262CF3 /* ConsumerOrderConsoleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsumerOrderConsoleView.swift; sourceTree = "<group>"; };
 		429C8F37756261E2A28FC462 /* ConsumerIOSDemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ConsumerIOSDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5CD2A436FB4C1BB4B2125B3E /* ConsumerOrderConsoleViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsumerOrderConsoleViewModel.swift; sourceTree = "<group>"; };
+		76A1BB85C2E9A2EF7F85E8F5 /* ConsumerDemoPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsumerDemoPresentation.swift; sourceTree = "<group>"; };
 		8F7FD31397EF57945304B101 /* ConsumerAppShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsumerAppShell.swift; sourceTree = "<group>"; };
 		93AFF5BF03DF79F3029DAEE5 /* ConsumerIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsumerIOSApp.swift; sourceTree = "<group>"; };
 		BAD32103257580924075D3E6 /* ConsumerAuthSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsumerAuthSessionManager.swift; sourceTree = "<group>"; };
@@ -76,6 +78,7 @@
 		0CB5DF4A0C3E1410A8F44176 /* ConsumerIOSApp */ = {
 			isa = PBXGroup;
 			children = (
+				76A1BB85C2E9A2EF7F85E8F5 /* ConsumerDemoPresentation.swift */,
 				93AFF5BF03DF79F3029DAEE5 /* ConsumerIOSApp.swift */,
 				337785A1A0DB345905262CF3 /* ConsumerOrderConsoleView.swift */,
 				5CD2A436FB4C1BB4B2125B3E /* ConsumerOrderConsoleViewModel.swift */,
@@ -196,6 +199,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5C7A021A3F0832C70F7396BB /* ConsumerDemoPresentation.swift in Sources */,
 				417F8A6825685E94F00CDB7B /* ConsumerIOSApp.swift in Sources */,
 				35E9FA77684DAC5AF08050F8 /* ConsumerOrderConsoleView.swift in Sources */,
 				5024AC72E4B3F39A2C712CB5 /* ConsumerOrderConsoleViewModel.swift in Sources */,
