@@ -63,6 +63,46 @@ export interface RealtimeEnvelope {
   payload: Record<string, unknown>;
 }
 
+export interface DemoSurfaceLink {
+  id: AppPersona;
+  label: string;
+  href: string;
+  description: string;
+  isCurrent: boolean;
+}
+
+export interface OrderStageDescriptor {
+  label: string;
+  persona: AppPersona;
+  tone: "attention" | "active" | "complete";
+}
+
+const DEFAULT_DEMO_SURFACE_URLS: Record<AppPersona, string> = {
+  consumer: "http://127.0.0.1:3003",
+  merchant: "http://127.0.0.1:3001",
+  courier: "http://127.0.0.1:3004",
+  admin: "http://127.0.0.1:3002",
+};
+
+const DEMO_SURFACE_DESCRIPTIONS: Record<AppPersona, { label: string; description: string }> = {
+  consumer: {
+    label: "Consumer",
+    description: "Create the order and follow the promise window.",
+  },
+  merchant: {
+    label: "Merchant",
+    description: "Accept the ticket and release it for dispatch.",
+  },
+  courier: {
+    label: "Courier",
+    description: "Accept, pick up, and complete fulfillment.",
+  },
+  admin: {
+    label: "Admin",
+    description: "Show SLOs, incidents, and operating controls.",
+  },
+};
+
 export function createAppSession(input: CreateAppSessionInput): AppSession {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + input.expiresInSeconds * 1000).toISOString();
@@ -100,4 +140,54 @@ export function isRealtimeEnvelope(candidate: unknown): candidate is RealtimeEnv
     value.payload !== null &&
     !Array.isArray(value.payload)
   );
+}
+
+export function buildDemoSurfaceLinks(
+  current: AppPersona,
+  overrides: Partial<Record<AppPersona, string>> = {},
+): DemoSurfaceLink[] {
+  return (Object.keys(DEFAULT_DEMO_SURFACE_URLS) as AppPersona[]).map((id) => ({
+    id,
+    label: DEMO_SURFACE_DESCRIPTIONS[id].label,
+    href: overrides[id] ?? DEFAULT_DEMO_SURFACE_URLS[id],
+    description: DEMO_SURFACE_DESCRIPTIONS[id].description,
+    isCurrent: id === current,
+  }));
+}
+
+export function describeOrderStage(status: string | null | undefined): OrderStageDescriptor {
+  switch (status) {
+    case "CREATED":
+      return {
+        label: "Awaiting Merchant",
+        persona: "merchant",
+        tone: "attention",
+      };
+    case "MERCHANT_ACCEPTED":
+    case "DISPATCH_REQUESTED":
+      return {
+        label: "Dispatching",
+        persona: "merchant",
+        tone: "active",
+      };
+    case "COURIER_ASSIGNED":
+    case "PICKED_UP":
+        return {
+        label: "Courier En Route",
+        persona: "courier",
+        tone: "active",
+      };
+    case "DELIVERED":
+      return {
+        label: "Completed",
+        persona: "consumer",
+        tone: "complete",
+      };
+    default:
+      return {
+        label: "Drafting Order",
+        persona: "consumer",
+        tone: "attention",
+      };
+  }
 }
