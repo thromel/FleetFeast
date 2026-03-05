@@ -21,11 +21,18 @@ public struct URLSessionHTTPClient: HTTPClient {
     }
 }
 
-public struct CourierJob: Decodable {
+public struct CourierJob: Decodable, Sendable {
     public let jobId: String
     public let orderId: String
     public let status: String
     public let courierId: String?
+
+    public init(jobId: String, orderId: String, status: String, courierId: String?) {
+        self.jobId = jobId
+        self.orderId = orderId
+        self.status = status
+        self.courierId = courierId
+    }
 }
 
 public struct FeatureFlagSnapshot: Decodable {
