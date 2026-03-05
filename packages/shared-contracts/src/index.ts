@@ -164,6 +164,7 @@ export function describeOrderStage(status: string | null | undefined): OrderStag
         tone: "attention",
       };
     case "MERCHANT_ACCEPTED":
+    case "DISPATCH_PENDING":
     case "DISPATCH_REQUESTED":
       return {
         label: "Dispatching",

@@ -1,6 +1,7 @@
 import { buildDemoSurfaceLinks } from "@fleetfeast/shared-contracts";
 
-import { listAvailableCourierJobs, type CourierJobView } from "../src/lib/api";
+import { listAvailableCourierJobs } from "../src/lib/api";
+import { buildCourierDemoState } from "../src/lib/demo-state";
 
 interface CourierPageProps {
   searchParams?: {
@@ -20,11 +21,11 @@ function resolveCourierId(rawValue: string | undefined): string {
   return trimmed.length > 0 ? trimmed : "courier-1";
 }
 
-function describeCourierJob(job: CourierJobView | null): {
+function describeCourierStatus(status: string | null | undefined): {
   label: string;
   tone: "attention" | "active" | "complete";
 } {
-  switch (job?.status) {
+  switch (status) {
     case "AVAILABLE":
       return { label: "Ready to Accept", tone: "attention" };
     case "ASSIGNED":
@@ -38,21 +39,6 @@ function describeCourierJob(job: CourierJobView | null): {
     default:
       return { label: "Waiting for Work", tone: "attention" };
   }
-}
-
-function selectPrimaryJob(
-  jobs: CourierJobView[],
-  preferredJobId: string | undefined,
-): CourierJobView | null {
-  const trimmedPreferredJobId = preferredJobId?.trim();
-  if (trimmedPreferredJobId) {
-    const matchedJob = jobs.find((job) => job.jobId === trimmedPreferredJobId);
-    if (matchedJob) {
-      return matchedJob;
-    }
-  }
-
-  return jobs[0] ?? null;
 }
 
 function canAccept(status: string): boolean {
@@ -70,14 +56,22 @@ function canDropoff(status: string): boolean {
 export default async function CourierPage({ searchParams }: CourierPageProps) {
   const courierId = resolveCourierId(searchParams?.courierId ?? process.env.COURIER_ID);
   const jobs = await listAvailableCourierJobs().catch(() => []);
-  const primaryJob = selectPrimaryJob(jobs, searchParams?.lastJobId);
-  const jobStage = describeCourierJob(primaryJob);
+  const demoState = buildCourierDemoState({
+    jobs,
+    lastJobId: searchParams?.lastJobId,
+    lastStatus: searchParams?.lastStatus,
+  });
+  const primaryJob = demoState.primaryJob;
+  const focusJobId = primaryJob?.jobId ?? demoState.followUpJobId;
+  const focusOrderId = primaryJob?.orderId ?? null;
+  const focusStatus = primaryJob?.status ?? demoState.followUpStatus;
+  const jobStage = describeCourierStatus(focusStatus);
   const demoLinks = buildDemoSurfaceLinks("courier", {
-    consumer: primaryJob
-      ? `http://127.0.0.1:3003?orderId=${encodeURIComponent(primaryJob.orderId)}`
+    consumer: focusOrderId
+      ? `http://127.0.0.1:3003?orderId=${encodeURIComponent(focusOrderId)}`
       : "http://127.0.0.1:3003",
-    merchant: primaryJob
-      ? `http://127.0.0.1:3001?orderId=${encodeURIComponent(primaryJob.orderId)}`
+    merchant: focusOrderId
+      ? `http://127.0.0.1:3001?orderId=${encodeURIComponent(focusOrderId)}`
       : "http://127.0.0.1:3001",
   });
   const availableCount = jobs.filter((job) => job.status === "AVAILABLE").length;
@@ -107,11 +101,13 @@ export default async function CourierPage({ searchParams }: CourierPageProps) {
 
         <article className="focus-card">
           <p className="eyebrow">Delivery Focus</p>
-          <h2>{primaryJob ? primaryJob.jobId : "No active job selected"}</h2>
+          <h2>{focusJobId ?? "No active job selected"}</h2>
           <p className="focus-copy">
             {primaryJob
               ? `Order ${primaryJob.orderId} is in ${primaryJob.status}. This is the screen to use during the live courier handoff.`
-              : "Request dispatch from the merchant surface, then reload this board to show the courier handoff."}
+              : demoState.followUpJobId && demoState.followUpStatus
+                ? `Continue the same job after ${demoState.followUpStatus.toLowerCase().replaceAll("_", " ")} without losing the demo handoff.`
+                : "Request dispatch from the merchant surface, then reload this board to show the courier handoff."}
           </p>
           <div className={`stage-pill tone-${jobStage.tone}`}>
             <span>Status</span>
@@ -168,12 +164,48 @@ export default async function CourierPage({ searchParams }: CourierPageProps) {
             </p>
           </div>
 
+          {demoState.followUpJobId && (demoState.canPickupFollowUp || demoState.canDropoffFollowUp) ? (
+            <article className="continuation-card">
+              <div>
+                <p>Continue last handoff</p>
+                <strong>{demoState.followUpJobId}</strong>
+                <span>{demoState.followUpStatus}</span>
+              </div>
+              <div className="job-actions">
+                <form method="post" action={`/jobs/${encodeURIComponent(demoState.followUpJobId)}/pickup`}>
+                  <input type="hidden" name="courierId" value={courierId} />
+                  <button
+                    className="secondary-button"
+                    type="submit"
+                    disabled={!demoState.canPickupFollowUp}
+                  >
+                    Pickup
+                  </button>
+                </form>
+                <form method="post" action={`/jobs/${encodeURIComponent(demoState.followUpJobId)}/dropoff`}>
+                  <input type="hidden" name="courierId" value={courierId} />
+                  <button
+                    className="tertiary-button"
+                    type="submit"
+                    disabled={!demoState.canDropoffFollowUp}
+                  >
+                    Dropoff
+                  </button>
+                </form>
+              </div>
+            </article>
+          ) : null}
+
           {jobs.length === 0 ? (
-            <p className="notice">No courier jobs are available yet in this environment.</p>
+            <p className="notice">
+              {demoState.followUpJobId
+                ? "No new courier jobs are available right now, but the current handoff can continue below."
+                : "No courier jobs are available yet in this environment."}
+            </p>
           ) : (
             <ul className="job-list">
               {jobs.map((job) => {
-                const state = describeCourierJob(job);
+                const state = describeCourierStatus(job.status);
 
                 return (
                   <li className="job-card" key={job.jobId}>
@@ -256,6 +288,21 @@ export default async function CourierPage({ searchParams }: CourierPageProps) {
                 <div>
                   <span>Status</span>
                   <strong>{primaryJob.status}</strong>
+                </div>
+              </div>
+            ) : demoState.followUpJobId && demoState.followUpStatus ? (
+              <div className="focus-summary">
+                <div>
+                  <span>Courier</span>
+                  <strong>{courierId}</strong>
+                </div>
+                <div>
+                  <span>Job</span>
+                  <strong>{demoState.followUpJobId}</strong>
+                </div>
+                <div>
+                  <span>Status</span>
+                  <strong>{demoState.followUpStatus}</strong>
                 </div>
               </div>
             ) : (

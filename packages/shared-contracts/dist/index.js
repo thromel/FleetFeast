@@ -72,6 +72,7 @@ export function describeOrderStage(status) {
                 tone: "attention",
             };
         case "MERCHANT_ACCEPTED":
+        case "DISPATCH_PENDING":
         case "DISPATCH_REQUESTED":
             return {
                 label: "Dispatching",

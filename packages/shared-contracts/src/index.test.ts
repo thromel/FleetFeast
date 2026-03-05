@@ -62,6 +62,12 @@ test("describeOrderStage groups backend statuses into client-demo steps", () => 
     tone: "attention",
   });
 
+  assert.deepEqual(describeOrderStage("DISPATCH_PENDING"), {
+    label: "Dispatching",
+    persona: "merchant",
+    tone: "active",
+  });
+
   assert.deepEqual(describeOrderStage("COURIER_ASSIGNED"), {
     label: "Courier En Route",
     persona: "courier",
