@@ -173,6 +173,15 @@ final class ConsumerOrderConsoleViewModel: ObservableObject {
         }
     }
 
+    func runDemo() async {
+        await signIn()
+        guard session != nil else {
+            return
+        }
+
+        await createOrder()
+    }
+
     private func resolveClient() -> ConsumerOrderingClient? {
         if let client {
             return client

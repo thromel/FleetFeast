@@ -51,6 +51,33 @@ struct CourierJobConsoleViewModelTests {
     }
 
     @Test
+    func runDemoSignsInAndLoadsJobs() async {
+        let jobsClient = FakeCourierJobsClient(
+            loadJobsResult: .success([
+                .init(jobId: "job-demo-1", orderId: "order-demo-1", status: "AVAILABLE", courierId: nil),
+            ]),
+            acceptResult: .success(.init(jobId: "job-demo-1", orderId: "order-demo-1", status: "ACCEPTED", courierId: "courier-demo")),
+            pickupResult: .success(.init(jobId: "job-demo-1", orderId: "order-demo-1", status: "PICKED_UP", courierId: "courier-demo")),
+            dropoffResult: .success(.init(jobId: "job-demo-1", orderId: "order-demo-1", status: "DROPPED_OFF", courierId: "courier-demo"))
+        )
+        let sessionClient = FakeCourierSessionClient(
+            signInResult: .success(makeCourierSessionResponse(userId: "courier-demo", accessToken: "access-1", refreshToken: "refresh-1")),
+            refreshResult: .success(makeCourierSessionResponse(userId: "courier-demo", accessToken: "access-2", refreshToken: "refresh-2"))
+        )
+
+        let model = CourierJobConsoleViewModel(client: jobsClient, sessionClient: sessionClient)
+
+        await model.runDemo()
+
+        #expect(model.session?.session.userId == "courier-demo")
+        #expect(model.courierId == "courier-demo")
+        #expect(model.jobs.count == 1)
+        #expect(model.jobs.first?.jobId == "job-demo-1")
+        #expect(await sessionClient.signInCallCount == 1)
+        #expect(await jobsClient.loadCallCount == 1)
+    }
+
+    @Test
     func loadJobsSuccessStoresJobsAndClearsError() async {
         let client = FakeCourierJobsClient(
             loadJobsResult: .success([

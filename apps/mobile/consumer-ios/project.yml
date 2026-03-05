@@ -1,0 +1,51 @@
+name: ConsumerIOSDemo
+options:
+  createIntermediateGroups: true
+configs:
+  Debug: debug
+  Release: release
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    IPHONEOS_DEPLOYMENT_TARGET: 16.0
+targets:
+  ConsumerIOSShell:
+    type: framework
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Sources/ConsumerIOSShell
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.fleetfeast.consumer.shell
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: YES
+
+  ConsumerIOSDemo:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: FleetFeast
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        UILaunchScreen: {}
+    sources:
+      - path: Sources/ConsumerIOSApp
+    dependencies:
+      - target: ConsumerIOSShell
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.fleetfeast.consumer.demo
+        GENERATE_INFOPLIST_FILE: NO
+
+schemes:
+  ConsumerIOSDemo:
+    build:
+      targets:
+        ConsumerIOSShell: all
+        ConsumerIOSDemo: all
+    run:
+      config: Debug

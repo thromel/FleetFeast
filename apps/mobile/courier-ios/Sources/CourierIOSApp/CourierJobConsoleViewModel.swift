@@ -101,6 +101,15 @@ final class CourierJobConsoleViewModel: ObservableObject {
         }
     }
 
+    func runDemo() async {
+        await signIn()
+        guard session != nil else {
+            return
+        }
+
+        await loadJobs()
+    }
+
     func accept(jobId: String) async {
         await applyAction(jobId: jobId, action: .accept)
     }

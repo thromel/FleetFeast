@@ -50,6 +50,16 @@ struct ConsumerOrderConsoleView: View {
                             }
                             .buttonStyle(.bordered)
                             .disabled(model.isBusy || model.session == nil)
+
+                            Button {
+                                Task {
+                                    await model.runDemo()
+                                }
+                            } label: {
+                                Label("Run Demo", systemImage: "sparkles")
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(model.isBusy)
                         }
 
                         if let session = model.session {

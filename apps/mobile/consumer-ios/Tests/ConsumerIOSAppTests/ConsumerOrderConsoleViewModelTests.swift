@@ -47,6 +47,30 @@ struct ConsumerOrderConsoleViewModelTests {
     }
 
     @Test
+    func runDemoSignsInAndCreatesOrder() async {
+        let orderingClient = FakeConsumerOrderingClient(
+            createOrderResult: .success(.init(id: "order-7", status: "CREATED", timelineVersion: 0)),
+            fetchOrderResult: .success(.init(id: "order-7", status: "CREATED", timelineVersion: 0))
+        )
+        let sessionClient = FakeConsumerSessionClient(
+            signInResult: .success(makeConsumerSessionResponse(userId: "consumer-demo", accessToken: "access-1", refreshToken: "refresh-1")),
+            refreshResult: .success(makeConsumerSessionResponse(userId: "consumer-demo", accessToken: "access-2", refreshToken: "refresh-2"))
+        )
+
+        let model = ConsumerOrderConsoleViewModel(client: orderingClient, sessionClient: sessionClient)
+        model.itemName = "Smash Burger"
+        model.unitPriceCents = 1599
+
+        await model.runDemo()
+
+        #expect(model.session?.session.userId == "consumer-demo")
+        #expect(model.consumerId == "consumer-demo")
+        #expect(model.order?.id == "order-7")
+        #expect(await sessionClient.signInCallCount == 1)
+        #expect(await orderingClient.createCallCount == 1)
+    }
+
+    @Test
     func createOrderSuccessStoresOrderAndClearsError() async {
         let client = FakeConsumerOrderingClient(
             createOrderResult: .success(.init(id: "order-1", status: "CREATED", timelineVersion: 0)),
