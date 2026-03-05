@@ -1,0 +1,51 @@
+name: CourierIOSDemo
+options:
+  createIntermediateGroups: true
+configs:
+  Debug: debug
+  Release: release
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    IPHONEOS_DEPLOYMENT_TARGET: 16.0
+targets:
+  CourierIOSShell:
+    type: framework
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Sources/CourierIOSShell
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.fleetfeast.courier.shell
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: YES
+
+  CourierIOSDemo:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: FleetFeast Courier
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        UILaunchScreen: {}
+    sources:
+      - path: Sources/CourierIOSApp
+    dependencies:
+      - target: CourierIOSShell
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.fleetfeast.courier.demo
+        GENERATE_INFOPLIST_FILE: NO
+
+schemes:
+  CourierIOSDemo:
+    build:
+      targets:
+        CourierIOSShell: all
+        CourierIOSDemo: all
+    run:
+      config: Debug
